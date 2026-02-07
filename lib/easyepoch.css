@@ -3,7 +3,9 @@
   top: 0;
   left: 0;
   overflow: auto;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   width: 100vw;
   height: 100vh;
   display: none;
@@ -15,61 +17,76 @@
 }
 
 .easyepoch-date-picker {
-  width: 326px;
+  width: 340px;
   cursor: initial;
-  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
-  background-color: #fff;
-  margin: 2% auto;
-  box-shadow: 1px 2px 4px 0.5px rgba(0, 0, 0, 0.22),
-              1px 2px 4px 0.5px rgba(0, 0, 0, 0.15);
+  background-color: #1e2030;
+  color: #e0e0e0;
+  margin: 5% auto;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.06);
+  overflow: hidden;
 }
 
 .easyepoch-day-header {
-  color: #fff;
-  background-color: #016565;
+  color: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(135deg, #7c3aed, #06b6d4);
   text-align: center;
-  padding: 4px 0;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .easyepoch-date-section {
   text-align: center;
-  background-color: #078e8e;
+  background: linear-gradient(135deg, #0d9488, #7c3aed);
   color: #fff;
+  padding-bottom: 2px;
 }
 
 .easyepoch-date-section .easyepoch-month-and-year {
-  font-size: 22px;
-  padding: 14px 0 7px 0;
-  font-weight: 200;
+  font-size: 20px;
+  padding: 16px 0 6px 0;
+  font-weight: 300;
+  letter-spacing: 0.3px;
+  opacity: 0.9;
 }
 
 .easyepoch-date-section .easyepoch-date {
-  font-size: 35px;
+  font-size: 40px;
   padding: 2px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  font-weight: 600;
 }
 
 .easyepoch-select-pane {
   display: flex;
   width: 100%;
+  align-items: center;
 }
 
 .easyepoch-select-pane .easyepoch-time,
 .easyepoch-selected-date {
   text-align: center;
   flex: 2;
+  color: #c4b5fd;
+  font-weight: 500;
 }
 
 .easyepoch-icon, .easyepoch-time,
 .easyepoch-selected-date {
   border: none;
   background: transparent;
-  padding: 2px;
+  padding: 4px;
   margin: 4px 6px;
-  width: 25px;
-  height: 25px;
+  width: 28px;
+  height: 28px;
   opacity: 0.5;
+  transition: opacity 0.2s, transform 0.2s;
 }
 
 .easyepoch-time, .easyepoch-selected-date {
@@ -77,11 +94,13 @@
 }
 
 .easyepoch-month-switcher {
-  margin-top: 5px;
+  margin-top: 8px;
+  padding: 4px 0;
 }
 
 .easyepoch-icon:hover {
-  opacity: 0.8;
+  opacity: 0.85;
+  transform: scale(1.1);
 }
 
 .easyepoch-icon:active, .easyepoch-icon.active {
@@ -93,11 +112,15 @@
 }
 
 .easyepoch-icon-next {
-  background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9ImZlYXRoZXIgZmVhdGhlci1hcnJvdy1yaWdodCI+PGxpbmUgeDE9IjUiIHkxPSIxMiIgeDI9IjE5IiB5Mj0iMTIiPjwvbGluZT48cG9seWxpbmUgcG9pbnRzPSIxMiA1IDE5IDEyIDEyIDE5Ij48L3BvbHlsaW5lPjwvc3ZnPg==);
+  background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNjNGI1ZmQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI5IDE4IDE1IDEyIDkgNiI+PC9wb2x5bGluZT48L3N2Zz4=);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .easyepoch-icon-previous {
-  background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9ImZlYXRoZXIgZmVhdGhlci1hcnJvdy1sZWZ0Ij48bGluZSB4MT0iMTkiIHkxPSIxMiIgeDI9IjUiIHkyPSIxMiI+PC9saW5lPjxwb2x5bGluZSBwb2ludHM9IjEyIDE5IDUgMTIgMTIgNSI+PC9wb2x5bGluZT48L3N2Zz4=);
+  background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNjNGI1ZmQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIxNSAxOCA5IDEyIDE1IDYiPjwvcG9seWxpbmU+PC9zdmc+);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .easyepoch-icon-calender {
@@ -109,30 +132,38 @@
 }
 
 .easyepoch-bottom-part {
-  padding-top: 6px;
-  padding-bottom: 12px;
-  padding-left: 48%;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .easyepoch-calender table {
   width: 100%;
   font-size: 13px;
+  border-collapse: collapse;
 }
 
 .easyepoch-calender thead th {
-  font-weight: normal;
-  font-size: 15px;
-  padding-bottom: 6px;
+  font-weight: 500;
+  font-size: 12px;
+  padding-bottom: 8px;
   width: 14.28%;
   height: 30px;
   text-align: center;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .easyepoch-calender tbody td {
   position: relative;
   text-align: center;
   vertical-align: middle;
-  padding: 12px;
+  padding: 10px;
+  color: #cbd5e1;
+  transition: color 0.15s;
 }
 
 .easyepoch-calender tbody td::after {
@@ -142,15 +173,20 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  height: 35px;
-  width: 35px;
+  height: 36px;
+  width: 36px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(255, 255, 255, 0.06);
+  transition: background-color 0.15s, visibility 0s;
 }
 
 .easyepoch-calender tbody td:hover::after {
   visibility: visible;
+}
+
+.easyepoch-calender tbody td:hover {
+  color: #fff;
 }
 
 .easyepoch-calender tbody td:active,
@@ -162,7 +198,7 @@
 .easyepoch-calender tbody td:active::after,
 .easyepoch-calender tbody .active::after {
   visibility: visible;
-  background-color: teal;
+  background: linear-gradient(135deg, #06b6d4, #7c3aed);
   z-index: -1;
 }
 
@@ -177,49 +213,52 @@
 
 .easyepoch-time-section input {
   box-sizing: border-box;
-  width: 120px;
-  height: 32px;
-  max-width: 120px;
-  max-height: 32px;
-  padding: 4px 3px;
+  width: 140px;
+  height: 36px;
+  max-width: 140px;
+  max-height: 36px;
+  padding: 6px 8px;
   border: none;
-  border-bottom: 2px solid #ccc;
-  font-size: 14px;
-  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   display: block;
   margin: 25% auto;
+  transition: border-color 0.2s;
 }
 
 .easyepoch-time-section input:focus {
   outline: none;
-  border-bottom-color: teal;
+  border-bottom-color: #7c3aed;
 }
 
 .easyepoch-picker-section {
   width: 100%;
   height: auto;
+  padding: 4px 8px;
 }
 
 .easyepoch-btn {
   border: none;
   background: transparent;
-  font-family: Verdana, Geneva, Tahoma, sans-serif;
-  font-size: 16px;
-  padding: 7px 14px;
-  border: 1px solid #ddd;
-  margin: 0 5px;
-  border-color: #016565;
-  color: #016565;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 13px;
+  font-weight: 500;
+  padding: 8px 20px;
+  border-radius: 8px;
+  color: #c4b5fd;
+  transition: all 0.2s;
 }
 
 .easyepoch-btn:hover, .easyepoch-btn:active {
-  color: white;
-  background-color: #016565;
+  color: #fff;
+  background: linear-gradient(135deg, #06b6d4, #7c3aed);
 }
 
 .easyepoch-fade {
-  color: rgba(225, 225, 225, 0.95);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .easyepoch-wrapper, .easyepoch-icon,
