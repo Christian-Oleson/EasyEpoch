@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChronosJS - Examples</title>
+  <link rel="stylesheet" href="simplepicker.css">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      background: #f8f9fa;
+    }
+
+    header {
+      background: linear-gradient(135deg, #016565, #078e8e);
+      color: #fff;
+      padding: 48px 24px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 8px 0;
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    header .badges {
+      margin-top: 16px;
+    }
+
+    header .badges a {
+      display: inline-block;
+      margin: 0 4px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .install-section {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.95rem;
+      overflow-x: auto;
+    }
+
+    .install-section span.prompt {
+      color: #6a9955;
+      user-select: none;
+    }
+
+    .example {
+      background: #fff;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      margin-bottom: 32px;
+      overflow: hidden;
+    }
+
+    .example-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #e1e4e8;
+      background: #f6f8fa;
+    }
+
+    .example-header h2 {
+      margin: 0 0 4px 0;
+      font-size: 1.25rem;
+    }
+
+    .example-header p {
+      margin: 0;
+      color: #586069;
+      font-size: 0.9rem;
+    }
+
+    .example-demo {
+      padding: 24px;
+    }
+
+    .example-code {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px 24px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      border-top: 1px solid #e1e4e8;
+      white-space: pre;
+    }
+
+    .demo-btn {
+      border: 2px solid #016565;
+      background: transparent;
+      color: #016565;
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .demo-btn:hover {
+      background: #016565;
+      color: #fff;
+    }
+
+    .demo-output {
+      margin-top: 12px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.85rem;
+      padding: 12px 16px;
+      background: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      min-height: 40px;
+      color: #586069;
+    }
+
+    .demo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .demo-input {
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      width: 280px;
+      max-width: 100%;
+    }
+
+    .demo-input:focus {
+      outline: none;
+      border-color: #078e8e;
+      box-shadow: 0 0 0 3px rgba(7, 142, 142, 0.15);
+    }
+
+    .picker-container {
+      margin-top: 16px;
+    }
+
+    .code-keyword { color: #569cd6; }
+    .code-string { color: #ce9178; }
+    .code-comment { color: #6a9955; }
+    .code-function { color: #dcdcaa; }
+    .code-number { color: #b5cea8; }
+    .code-tag { color: #808080; }
+    .code-attr { color: #9cdcfe; }
+
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: #586069;
+      font-size: 0.9rem;
+      border-top: 1px solid #e1e4e8;
+    }
+
+    footer a {
+      color: #016565;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>ChronosJS</h1>
+  <p>A lightweight datetime picker in vanilla JavaScript with zero dependencies.</p>
+  <div class="badges">
+    <a href="https://www.npmjs.com/package/simplepicker"><img src="https://img.shields.io/npm/v/simplepicker.svg" alt="npm version"></a>
+    <a href="https://github.com/Christian-Oleson/ChronosJS/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="install-section">
+    <span class="prompt">$ </span>npm install simplepicker
+  </div>
+
+  <!-- Example 1: Basic Usage -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Basic Usage</h2>
+      <p>Create a picker, open it with a button, and listen for the selected date.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="basic-btn">Open Picker</button>
+      <div class="demo-output" id="basic-output">Click the button to select a date...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>();
+
+picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  console.<span class="code-function">log</span>(readableDate); <span class="code-comment">// "7th February 2026 3:30 PM"</span>
+});
+
+document.<span class="code-function">querySelector</span>(<span class="code-string">'button'</span>).<span class="code-function">addEventListener</span>(<span class="code-string">'click'</span>, () => {
+  picker.<span class="code-function">open</span>();
+});</div>
+  </div>
+
+  <!-- Example 2: Bound to Element -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Bound to Element</h2>
+      <p>Attach the picker to a specific container element instead of the body.</p>
+    </div>
+    <div class="example-demo">
+      <div class="demo-row">
+        <input type="text" class="demo-input" id="bound-input" placeholder="Selected date appears here" readonly>
+        <button class="demo-btn" id="bound-btn">Pick Date</button>
+      </div>
+      <div class="picker-container" id="bound-container"></div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>(<span class="code-string">'#my-container'</span>, {
+  zIndex: <span class="code-number">10</span>
+});
+
+picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  document.<span class="code-function">querySelector</span>(<span class="code-string">'input'</span>).value = readableDate;
+});</div>
+  </div>
+
+  <!-- Example 3: Compact Mode -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Compact Mode</h2>
+      <p>Hide the large date display header for a smaller, more compact layout.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="compact-btn">Open Compact Picker</button>
+      <div class="demo-output" id="compact-output">Click the button to try compact mode...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>({
+  compactMode: <span class="code-keyword">true</span>
+});
+
+picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  console.<span class="code-function">log</span>(readableDate);
+});</div>
+  </div>
+
+  <!-- Example 4: Date Only (No Time) -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Date Only (No Time)</h2>
+      <p>Disable the time picker section when you only need a date.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="notime-btn">Open Date-Only Picker</button>
+      <div class="demo-output" id="notime-output">Click the button to pick a date without time...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>({
+  disableTimeSection: <span class="code-keyword">true</span>
+});
+
+picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  console.<span class="code-function">log</span>(readableDate);
+});</div>
+  </div>
+
+  <!-- Example 5: Pre-selected Date -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Pre-selected Date</h2>
+      <p>Initialize the picker with a specific date already selected.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="preselect-btn">Open Pre-selected Picker</button>
+      <div class="demo-output" id="preselect-output">Opens with Dec 31, 2026 pre-selected...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>({
+  selectedDate: <span class="code-keyword">new</span> <span class="code-function">Date</span>(<span class="code-number">2026</span>, <span class="code-number">11</span>, <span class="code-number">31</span>, <span class="code-number">23</span>, <span class="code-number">59</span>)
+});
+
+picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  console.<span class="code-function">log</span>(readableDate);
+});</div>
+  </div>
+
+  <!-- Example 6: Multiple Pickers -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Multiple Pickers</h2>
+      <p>Use two separate picker instances for a start and end date range.</p>
+    </div>
+    <div class="example-demo">
+      <div class="demo-row">
+        <input type="text" class="demo-input" id="start-input" placeholder="Start date" readonly style="width: 220px;">
+        <button class="demo-btn" id="start-btn">Start</button>
+      </div>
+      <div style="height: 12px;"></div>
+      <div class="demo-row">
+        <input type="text" class="demo-input" id="end-input" placeholder="End date" readonly style="width: 220px;">
+        <button class="demo-btn" id="end-btn">End</button>
+      </div>
+      <div class="picker-container" id="start-container"></div>
+      <div class="picker-container" id="end-container"></div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> startPicker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>(<span class="code-string">'#start-container'</span>);
+<span class="code-keyword">const</span> endPicker = <span class="code-keyword">new</span> <span class="code-function">SimplePicker</span>(<span class="code-string">'#end-container'</span>);
+
+startPicker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  document.<span class="code-function">querySelector</span>(<span class="code-string">'#start'</span>).value = readableDate;
+});
+
+endPicker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  document.<span class="code-function">querySelector</span>(<span class="code-string">'#end'</span>).value = readableDate;
+});</div>
+  </div>
+
+  <!-- Example 7: Event Handling -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Event Handling</h2>
+      <p>Listen to both <code>submit</code> and <code>close</code> events from the picker.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="events-btn">Open Picker</button>
+      <div class="demo-output" id="events-output">Event log appears here...</div>
+    </div>
+    <div class="example-code">picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  log.<span class="code-function">append</span>(<span class="code-string">`Selected: ${readableDate}`</span>);
+});
+
+picker.<span class="code-function">on</span>(<span class="code-string">'close'</span>, () => {
+  log.<span class="code-function">append</span>(<span class="code-string">'Picker was closed/cancelled'</span>);
+});</div>
+  </div>
+
+</div>
+
+<footer>
+  <p>
+    <a href="https://github.com/Christian-Oleson/ChronosJS">GitHub</a> &middot;
+    <a href="https://www.npmjs.com/package/simplepicker">npm</a> &middot;
+    MIT License
+  </p>
+</footer>
+
+<script src="simplepicker.js"></script>
+<script>
+  // Example 1: Basic Usage
+  (function() {
+    var picker = new SimplePicker({ zIndex: 10 });
+    var btn = document.getElementById('basic-btn');
+    var output = document.getElementById('basic-output');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      output.textContent = 'Selected: ' + readableDate;
+    });
+
+    picker.on('close', function() {
+      output.textContent = 'Picker closed.';
+    });
+  })();
+
+  // Example 2: Bound to Element
+  (function() {
+    var picker = new SimplePicker('#bound-container', { zIndex: 10 });
+    var btn = document.getElementById('bound-btn');
+    var input = document.getElementById('bound-input');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      input.value = readableDate;
+    });
+  })();
+
+  // Example 3: Compact Mode
+  (function() {
+    var picker = new SimplePicker({ zIndex: 10, compactMode: true });
+    var btn = document.getElementById('compact-btn');
+    var output = document.getElementById('compact-output');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      output.textContent = 'Selected: ' + readableDate;
+    });
+
+    picker.on('close', function() {
+      output.textContent = 'Picker closed.';
+    });
+  })();
+
+  // Example 4: Date Only (No Time)
+  (function() {
+    var picker = new SimplePicker({ zIndex: 10, disableTimeSection: true });
+    var btn = document.getElementById('notime-btn');
+    var output = document.getElementById('notime-output');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      output.textContent = 'Selected: ' + readableDate;
+    });
+
+    picker.on('close', function() {
+      output.textContent = 'Picker closed.';
+    });
+  })();
+
+  // Example 5: Pre-selected Date
+  (function() {
+    var picker = new SimplePicker({
+      zIndex: 10,
+      selectedDate: new Date(2026, 11, 31, 23, 59)
+    });
+    var btn = document.getElementById('preselect-btn');
+    var output = document.getElementById('preselect-output');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      output.textContent = 'Selected: ' + readableDate;
+    });
+
+    picker.on('close', function() {
+      output.textContent = 'Picker closed.';
+    });
+  })();
+
+  // Example 6: Multiple Pickers
+  (function() {
+    var startPicker = new SimplePicker('#start-container', { zIndex: 10 });
+    var endPicker = new SimplePicker('#end-container', { zIndex: 10 });
+    var startBtn = document.getElementById('start-btn');
+    var endBtn = document.getElementById('end-btn');
+    var startInput = document.getElementById('start-input');
+    var endInput = document.getElementById('end-input');
+
+    startBtn.addEventListener('click', function() { startPicker.open(); });
+    endBtn.addEventListener('click', function() { endPicker.open(); });
+
+    startPicker.on('submit', function(date, readableDate) {
+      startInput.value = readableDate;
+    });
+
+    endPicker.on('submit', function(date, readableDate) {
+      endInput.value = readableDate;
+    });
+  })();
+
+  // Example 7: Event Handling
+  (function() {
+    var picker = new SimplePicker({ zIndex: 10 });
+    var btn = document.getElementById('events-btn');
+    var output = document.getElementById('events-output');
+    var events = [];
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      events.push('[submit] ' + readableDate);
+      output.textContent = events.join('\n');
+    });
+
+    picker.on('close', function() {
+      events.push('[close] Picker was closed/cancelled');
+      output.textContent = events.join('\n');
+    });
+  })();
+</script>
+</body>
+</html>
