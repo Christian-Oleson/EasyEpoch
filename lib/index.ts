@@ -34,6 +34,7 @@ class EasyEpoch {
   private $easyepochWrapper: HTMLElement;
   private $trs: HTMLElement[];
   private $tds: HTMLElement[];
+  private $lastRow: HTMLElement;
   private $headerMonthAndYear: HTMLElement;
   private $monthAndYear: HTMLElement;
   private $date: HTMLElement;
@@ -44,6 +45,7 @@ class EasyEpoch {
   private $cancel: HTMLElement;
   private $ok: HTMLElement;
   private $displayDateElements: HTMLElement[];
+  private $activeCell: HTMLElement | null;
   private monthTracker: MonthTracker;
 
   constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts) {
@@ -95,8 +97,9 @@ class EasyEpoch {
 
     const { $, $$ } = this;
     this.$easyepoch = $('.easyepoch-date-picker');
-    this.$trs = $$('.easyepoch-calender tbody tr');
-    this.$tds = $$('.easyepoch-calender tbody td');
+    this.$trs = Array.from($$('.easyepoch-calender tbody tr'));
+    this.$tds = Array.from($$('.easyepoch-calender tbody td'));
+    this.$lastRow = this.$trs[this.$trs.length - 1];
     this.$headerMonthAndYear = $('.easyepoch-month-and-year');
     this.$monthAndYear = $('.easyepoch-selected-date');
     this.$date = $('.easyepoch-date');
@@ -112,6 +115,8 @@ class EasyEpoch {
       this.$headerMonthAndYear,
       this.$date
     ];
+
+    this.$activeCell = null;
 
     this.$time.classList.add('easyepoch-fade');
     const now = new Date();
@@ -145,7 +150,7 @@ class EasyEpoch {
     const timeFull = date.toTimeString().split(" ")[0]
     const time = timeFull.replace(/\:\d\d$/, "");
     this.$timeInput.value = time;
-    this.$time.innerText = dateUtil.formatTimeFromInputElement(time);
+    this.$time.textContent = dateUtil.formatTimeFromInputElement(time);
 
     const dateString = date.getDate().toString();
     const $dateEl = this.findElementWithDate(dateString);
@@ -178,7 +183,7 @@ class EasyEpoch {
 
   clearRows() {
     this.$tds.forEach((td) => {
-      td.innerHTML = '';
+      td.textContent = '';
       td.classList.remove('active');
     });
   }
@@ -189,14 +194,14 @@ class EasyEpoch {
     const year = date.getFullYear();
     const monthAndYear = month + ' ' + year;
 
-    this.$headerMonthAndYear.innerHTML = monthAndYear;
-    this.$monthAndYear.innerHTML = monthAndYear;
-    this.$day.innerHTML = day;
-    this.$date.innerHTML = dateUtil.getDisplayDate(date);
+    this.$headerMonthAndYear.textContent = monthAndYear;
+    this.$monthAndYear.textContent = monthAndYear;
+    this.$day.textContent = day;
+    this.$date.textContent = dateUtil.getDisplayDate(date);
   }
 
   render(data) {
-    const { $$, $trs } = this;
+    const { $trs, $lastRow } = this;
     const { month, date } = data;
 
     this.clearRows();
@@ -210,26 +215,21 @@ class EasyEpoch {
         }
 
         td.removeAttribute('data-empty');
-        td.innerHTML = day;
+        td.textContent = day;
       });
     });
 
-    const $lastRowDates = $$('table tbody tr:last-child td');
-    let lasRowIsEmpty = true;
-    $lastRowDates.forEach(date => {
-      if (date.dataset.empty === undefined) {
-        lasRowIsEmpty = false;
+    // hide last row if it's empty to avoid extra spacing
+    const lastRowCells = $lastRow.children;
+    let lastRowIsEmpty = true;
+    for (let i = 0; i < lastRowCells.length; i++) {
+      if (!(lastRowCells[i] as HTMLElement).hasAttribute('data-empty')) {
+        lastRowIsEmpty = false;
+        break;
       }
-    });
-
-    // hide last row if it's empty to avoid
-    // extra spacing due to last row
-    const $lastRow = $lastRowDates[0].parentElement;
-    if (lasRowIsEmpty && $lastRow) {
-      $lastRow.style.display = 'none';
-    } else {
-      $lastRow.style.display = 'table-row';
     }
+
+    $lastRow.style.display = lastRowIsEmpty ? 'none' : 'table-row';
 
     this.updateDateComponents(date);
   }
@@ -239,14 +239,16 @@ class EasyEpoch {
 
     let day;
     if (el) {
-      day = el.innerHTML.trim();
+      day = el.textContent!.trim();
     } else {
-      day = this.$date.innerHTML.replace(/[a-z]+/, '');
+      day = $date.textContent!.replace(/[a-z]+/, '');
     }
 
-    const [ monthName, year ] = $monthAndYear.innerHTML.split(' ');
+    const monthAndYearText = $monthAndYear.textContent!;
+    const [ monthName, year ] = monthAndYearText.split(' ');
     const month = dateUtil.months.indexOf(monthName);
-    let timeComponents = $time.innerHTML.split(':');
+    const timeText = $time.textContent!;
+    let timeComponents = timeText.split(':');
     let hours = +timeComponents[0];
     let [ minutes, meridium ] = timeComponents[1].split(' ');
 
@@ -262,17 +264,17 @@ class EasyEpoch {
     this.selectedDate = date;
 
     let _date = day + ' ';
-    _date += $monthAndYear.innerHTML.trim() + ' ';
-    _date += $time.innerHTML.trim();
+    _date += monthAndYearText.trim() + ' ';
+    _date += timeText.trim();
     this.readableDate = _date.replace(/^\d+/, dateUtil.getDisplayDate(date));
   }
 
   selectDateElement(el: HTMLElement) {
-    const alreadyActive = this.$('.easyepoch-calender tbody .active');
-    el.classList.add('active');
-    if (alreadyActive) {
-      alreadyActive.classList.remove('active');
+    if (this.$activeCell) {
+      this.$activeCell.classList.remove('active');
     }
+    el.classList.add('active');
+    this.$activeCell = el;
 
     this.updateSelectedDate(el);
     this.updateDateComponents(this.selectedDate);
@@ -281,23 +283,19 @@ class EasyEpoch {
   findElementWithDate(date, returnLastIfNotFound: boolean = false) {
     const { $tds } = this;
 
-    let el, lastTd;
-    $tds.forEach((td) => {
-      const content = td.innerHTML.trim();
+    let lastTd;
+    for (let i = 0; i < $tds.length; i++) {
+      const td = $tds[i];
+      const content = td.textContent!.trim();
       if (content === date) {
-        el = td;
+        return td;
       }
-
       if (content !== '') {
         lastTd = td;
       }
-    });
-
-    if (el === undefined && returnLastIfNotFound) {
-      el = lastTd;
     }
 
-    return el;
+    return returnLastIfNotFound ? lastTd : undefined;
   }
 
   handleIconButtonClick(el: HTMLElement) {
@@ -337,7 +335,7 @@ class EasyEpoch {
     let selectedDate;
     const $active = $('.easyepoch-calender td.active');
     if ($active) {
-      selectedDate = $active.innerHTML.trim();
+      selectedDate = $active.textContent!.trim();
     }
 
     if (el.classList.contains(nextIcon)) {
@@ -359,20 +357,20 @@ class EasyEpoch {
       $easyepoch, $timeInput,
       $ok, $cancel, $easyepochWrapper
     } = this;
-    const _this = this;
-    $easyepoch.addEventListener('click', function (e) {
+
+    $easyepoch.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       const tagName = target.tagName.toLowerCase();
 
       e.stopPropagation();
       if (tagName === 'td' && target.dataset.empty === undefined) {
-        _this.selectDateElement(target);
+        this.selectDateElement(target);
         return;
       }
 
       if (tagName === 'button' &&
           target.classList.contains('easyepoch-icon')) {
-        _this.handleIconButtonClick(target);
+        this.handleIconButtonClick(target);
         return;
       }
     });
@@ -383,20 +381,20 @@ class EasyEpoch {
       }
 
       const formattedTime = dateUtil.formatTimeFromInputElement(e.target.value);
-      _this.$time.innerHTML = formattedTime;
-      _this.updateSelectedDate();
+      this.$time.textContent = formattedTime;
+      this.updateSelectedDate();
     });
 
-    $ok.addEventListener('click', function () {
-      _this.close();
-      _this.callEvent('submit', function (func) {
-        func(_this.selectedDate, _this.readableDate);
+    $ok.addEventListener('click', () => {
+      this.close();
+      this.callEvent('submit', (func) => {
+        func(this.selectedDate, this.readableDate);
       });
     });
 
-    function close() {
-      _this.close();
-      _this.callEvent('close', function (f) { f() });
+    const close = () => {
+      this.close();
+      this.callEvent('close', (f) => { f() });
     };
 
     $cancel.addEventListener('click', close);
