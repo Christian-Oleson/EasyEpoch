@@ -1,11 +1,4 @@
-function repeat(str: string, times: number): string {
-  let repeated = '';
-  for (let i = 1; i <= times; i++) {
-    repeated += str;
-  }
-
-  return repeated;
-}
+const calendarRow = '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 
 export const htmlTemplate = `
 <div class="easyepoch-wrapper">
@@ -33,7 +26,7 @@ export const htmlTemplate = `
                 <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
               </thead>
               <tbody>
-                ${ repeat('<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>', 6) }
+                ${ calendarRow.repeat(6) }
               </tbody>
             </table>
           </div>

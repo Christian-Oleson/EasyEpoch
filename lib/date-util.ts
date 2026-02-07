@@ -32,14 +32,8 @@ export const days = [
   'Saturday'
 ];
 
-function fill<T>(arr: T[], upto: number): T[] {
-  const temp: T[] = [];
-  arr = temp.concat(arr);
-  for (let i = 0; i < upto; i++) {
-    (arr[i] as any) = undefined; 
-  }
-
-  return arr;
+function emptyRow(length: number): undefined[] {
+  return new Array(length);
 }
 
 // builds the calender for one month given a date
@@ -76,7 +70,7 @@ export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker) {
     const _date = date.getDate();
     const day = date.getDay();
     if (_date === 1) {
-      monthData[rowTracker] = fill([], day);
+      monthData[rowTracker] = emptyRow(day);
     }
 
     monthData[rowTracker] = monthData[rowTracker] || [];
@@ -92,16 +86,16 @@ export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker) {
   let lastRow = 5;
   if (monthData[5] === undefined) {
     lastRow = 4;
-    monthData[5] = fill([], 7);
+    monthData[5] = emptyRow(7);
   }
   if (monthData[4] === undefined) {
     lastRow = 3;
-    monthData[4] = fill([], 7);
+    monthData[4] = emptyRow(7);
   }
 
   let lastRowLength = monthData[lastRow].length;
   if (lastRowLength < 7) {
-    let filled = monthData[lastRow].concat(fill([], 7 - lastRowLength));
+    let filled = monthData[lastRow].concat(emptyRow(7 - lastRowLength));
     monthData[lastRow] = filled;
   }
 
@@ -129,25 +123,17 @@ export function scrapeNextMonth(tracker: MonthTracker = monthTracker) {
   return scrapeMonth(date, tracker);
 }
 
-const dateEndings = {
-  st: [1, 21, 31],
-  nd: [2, 22],
-  rd: [3, 23]
-};
-
 export function getDisplayDate(_date: Date) {
   const date = _date.getDate();
-  if (dateEndings.st.indexOf(date) !== -1) {
-    return date + 'st';
+  const mod10 = date % 10;
+
+  if (date > 10 && date < 14) {
+    return date + 'th';
   }
 
-  if (dateEndings.nd.indexOf(date) !== -1) {
-    return date + 'nd';
-  }
-
-  if (dateEndings.rd.indexOf(date) !== -1) {
-    return date + 'rd';
-  }
+  if (mod10 === 1) return date + 'st';
+  if (mod10 === 2) return date + 'nd';
+  if (mod10 === 3) return date + 'rd';
 
   return date + 'th';
 }
