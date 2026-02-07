@@ -2,6 +2,8 @@
 
 A lightweight datetime picker in vanilla JavaScript with zero dependencies.
 
+[Live Examples](https://christian-oleson.github.io/ChronosJS/)
+
 ChronosJS is a fork of [simplepicker](https://github.com/priyank-p/simplepicker) by Priyank Patel, originally based on [material-datetime-picker](https://github.com/ripjar/material-datetime-picker) but without relying on external dependencies like `moment`, `rome`, or `materialize`.
 
 ## Installation

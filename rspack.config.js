@@ -1,14 +1,12 @@
 const path = require('path');
+const rspack = require('@rspack/core');
 
 const ROOT_DIR = __dirname;
 module.exports = function (env) {
   const production = env && env.production;
   let config = {
     entry: {
-      simplepicker: [
-        './lib/simplepicker.css',
-        './lib/index.ts'
-      ]
+      simplepicker: './lib/index.ts'
     },
     output: {
       filename: '[name].js',
@@ -26,15 +24,15 @@ module.exports = function (env) {
     optimization: {
       moduleIds: 'deterministic'
     },
-    experiments: {
-      css: true
-    },
+    plugins: [
+      new rspack.CopyRspackPlugin({
+        patterns: [
+          { from: 'lib/simplepicker.css', to: 'simplepicker.css' }
+        ]
+      })
+    ],
     module: {
       rules: [
-        {
-          test: /\.css$/,
-          type: 'css'
-        },
         {
           test: /\.ts$/,
           exclude: [/node_modules/, /tests/],
@@ -46,6 +44,9 @@ module.exports = function (env) {
               },
               target: 'es5',
             },
+            module: {
+              type: 'commonjs',
+            },
           },
           type: 'javascript/auto',
         }
@@ -56,13 +57,20 @@ module.exports = function (env) {
   if (production) {
     // build a commonjs format file for consumption with
     // build tools like webpack, rspack, and rollup.
-    let nodeConfig = { output: {} };
-    nodeConfig.output.libraryTarget = 'commonjs2';
-    nodeConfig.entry = {
-      'simplepicker.node': './lib/index.ts'
+    const nodeConfig = {
+      ...config,
+      entry: {
+        'simplepicker.node': './lib/index.ts'
+      },
+      output: {
+        ...config.output,
+        library: undefined,
+        libraryTarget: 'commonjs2',
+      },
+      plugins: [],
     };
 
-    config = [config, { ...config, ...nodeConfig }];
+    config = [config, nodeConfig];
   } else {
     config.output.publicPath = '/dist/';
   }
