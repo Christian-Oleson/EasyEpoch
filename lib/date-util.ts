@@ -1,5 +1,5 @@
 export interface MonthTracker {
-  years: Object;
+  years: object;
   current?: Date;
 };
 
@@ -64,7 +64,7 @@ export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker) {
   date.setDate(1);
   tracker.years[year][month] = [];
 
-  let monthData = tracker.years[year][month];
+  const monthData = tracker.years[year][month];
   let rowTracker = 0;
   while (date.getMonth() === month) {
     const _date = date.getDate();
@@ -93,9 +93,9 @@ export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker) {
     monthData[4] = emptyRow(7);
   }
 
-  let lastRowLength = monthData[lastRow].length;
+  const lastRowLength = monthData[lastRow].length;
   if (lastRowLength < 7) {
-    let filled = monthData[lastRow].concat(emptyRow(7 - lastRowLength));
+    const filled = monthData[lastRow].concat(emptyRow(7 - lastRowLength));
     monthData[lastRow] = filled;
   }
 
@@ -141,7 +141,8 @@ export function getDisplayDate(_date: Date) {
 export function formatTimeFromInputElement(input: string) {
   let timeString = '';
   type StringOrNumberTuple = [string | number, string | number];
-  let [ hour, minute ] = input.split(':') as StringOrNumberTuple;
+  const [ hourStr, minute ] = input.split(':') as StringOrNumberTuple;
+  let hour = hourStr;
   hour = +hour;
 
   const isPM = hour >= 12;

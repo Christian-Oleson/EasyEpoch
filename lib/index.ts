@@ -31,8 +31,8 @@ class EasyEpoch {
   _validOnListeners = validListeners;
 
   private opts: EasyEpochOpts;
-  private $: Function;
-  private $$: Function;
+  private $: (sel: string) => HTMLElement;
+  private $$: (sel: string) => NodeListOf<HTMLElement>;
   private $easyepoch: HTMLElement;
   private $easyepochWrapper: HTMLElement;
   private $trs: HTMLElement[];
@@ -89,9 +89,9 @@ class EasyEpoch {
   // element we need for easyepoch.
   // Also, Limit the query to the wrapper class to avoid
   // selecting elements on the other instance.
-  initElMethod(el) {
-    this.$ = (sel) => el.querySelector(sel);
-    this.$$ = (sel) => el.querySelectorAll(sel);
+  initElMethod(el: HTMLElement) {
+    this.$ = (sel: string) => el.querySelector(sel) as HTMLElement;
+    this.$$ = (sel: string) => el.querySelectorAll(sel);
   }
 
   init(wrapper: HTMLElement, opts: EasyEpochOpts) {
@@ -147,13 +147,13 @@ class EasyEpoch {
 
   // Reset by selecting current date.
   reset(newDate?: Date) {
-    let date = newDate || new Date();
+    const date = newDate || new Date();
     this.render(dateUtil.scrapeMonth(date, this.monthTracker));
 
     // The timeFull variable below will be formatted as HH:mm:ss.
     // Using regular experssion we remove the :ss parts.
     const timeFull = date.toTimeString().split(" ")[0]
-    const time = timeFull.replace(/\:\d\d$/, "");
+    const time = timeFull.replace(/:\d\d$/, "");
     this.$timeInput.value = time;
     this.$time.textContent = dateUtil.formatTimeFromInputElement(time);
 
@@ -235,7 +235,7 @@ class EasyEpoch {
     this.$date.textContent = dateUtil.getDisplayDate(date);
   }
 
-  render(data) {
+  render(data: { month: unknown[][]; date: Date }) {
     const { $trs, $lastRow } = this;
     const { month, date } = data;
 
@@ -283,9 +283,9 @@ class EasyEpoch {
     const [ monthName, year ] = monthAndYearText.split(' ');
     const month = dateUtil.months.indexOf(monthName);
     const timeText = $time.textContent!;
-    let timeComponents = timeText.split(':');
+    const timeComponents = timeText.split(':');
     let hours = +timeComponents[0];
-    let [ minutes, meridium ] = timeComponents[1].split(' ');
+    const [ minutes, meridium ] = timeComponents[1].split(' ');
 
     if (meridium === 'AM' && hours == 12) {
       hours = 0;
@@ -315,7 +315,7 @@ class EasyEpoch {
     this.updateDateComponents(this.selectedDate);
   }
 
-  findElementWithDate(date, returnLastIfNotFound: boolean = false) {
+  findElementWithDate(date: string, returnLastIfNotFound: boolean = false) {
     const { $tds } = this;
 
     let lastTd;
@@ -382,7 +382,7 @@ class EasyEpoch {
     }
 
     if (selectedDate) {
-      let $dateTd = this.findElementWithDate(selectedDate, true);
+      const $dateTd = this.findElementWithDate(selectedDate, true);
       this.selectDateElement($dateTd);
     }
   }
@@ -410,12 +410,12 @@ class EasyEpoch {
       }
     });
 
-    $timeInput.addEventListener('input', (e: any) => {
-      if (e.target.value === '') {
+    $timeInput.addEventListener('input', (e: Event) => {
+      if ((e.target as HTMLInputElement).value === '') {
         return;
       }
 
-      const formattedTime = dateUtil.formatTimeFromInputElement(e.target.value);
+      const formattedTime = dateUtil.formatTimeFromInputElement((e.target as HTMLInputElement).value);
       this.$time.textContent = formattedTime;
       this.updateSelectedDate();
     });

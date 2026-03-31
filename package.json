@@ -15,7 +15,8 @@
     "start": "rspack serve --hot",
     "prepack": "rspack build --mode production --env production",
     "build": "rspack build --mode production --env production",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint lib/"
   },
   "files": [
     "dist/",
@@ -42,10 +43,14 @@
   },
   "homepage": "https://github.com/Christian-Oleson/EasyEpoch#readme",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@rspack/cli": "^1.7.5",
     "@rspack/core": "^1.7.5",
+    "eslint": "^10.1.0",
+    "eslint-plugin-security": "^4.0.0",
     "jsdom": "^28.0.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.0",
     "vitest": "^4.0.18"
   }
 }
