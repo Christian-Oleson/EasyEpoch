@@ -180,6 +180,16 @@ class EasyEpoch {
     $timeSectionIcon.style.visibility = 'visible';
   }
 
+  // Allowed CSS custom property name pattern: only alphanumeric, hyphens, and underscores.
+  private static readonly CSS_VAR_NAME_RE = /^--[a-zA-Z0-9_-]+$/;
+  // Block CSS values that could exfiltrate data via url()/image()/image-set() or
+  // execute expressions (legacy IE expression()).
+  private static readonly UNSAFE_CSS_VALUE_RE = /url\s*\(|image\s*\(|image-set\s*\(|expression\s*\(/i;
+  // Prototype-polluting keys that must never be forwarded.
+  private static readonly BANNED_KEYS: ReadonlySet<string> = new Set([
+    '__proto__', 'constructor', 'prototype',
+  ]);
+
   setTheme(theme: EasyEpochTheme) {
     const wrapper = this.$easyepochWrapper;
 
@@ -199,21 +209,37 @@ class EasyEpoch {
       wrapper.classList.add('easyepoch-theme-light');
     } else if (theme === 'dark') {
       wrapper.classList.add('easyepoch-theme-dark');
-    } else if (typeof theme === 'object') {
+    } else if (typeof theme === 'object' && theme !== null) {
       for (const key of Object.keys(theme)) {
+        // Guard against prototype pollution payloads
+        if (EasyEpoch.BANNED_KEYS.has(key)) continue;
+
         const varName = key.startsWith('--') ? key : '--easyepoch-' + key;
-        style.setProperty(varName, theme[key]);
+
+        // Validate the CSS custom property name to prevent injection
+        if (!EasyEpoch.CSS_VAR_NAME_RE.test(varName)) continue;
+
+        const value = theme[key];
+        if (typeof value !== 'string') continue;
+
+        // Block values that could exfiltrate data or execute expressions
+        if (EasyEpoch.UNSAFE_CSS_VALUE_RE.test(value)) continue;
+
+        style.setProperty(varName, value);
       }
     }
   }
 
   injectTemplate(el: HTMLElement): HTMLElement {
-    const $template = document.createElement('template');
-    $template.innerHTML = htmlTemplate;
-    const content = $template.content.cloneNode(true) as DocumentFragment;
-    const wrapper = content.querySelector('.easyepoch-wrapper') as HTMLElement;
-    el.appendChild(content);
-    return wrapper;
+    // Use DOMParser instead of innerHTML to avoid XSS concerns (CodeQL js/xss-through-dom).
+    // The template is a compile-time constant, but using DOMParser makes that guarantee
+    // enforceable by static analysis and prevents future regressions.
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlTemplate, 'text/html');
+    const wrapper = doc.querySelector('.easyepoch-wrapper') as HTMLElement;
+    const importedNode = document.importNode(wrapper, true);
+    el.appendChild(importedNode);
+    return importedNode;
   }
 
   clearRows() {
@@ -272,22 +298,27 @@ class EasyEpoch {
   updateSelectedDate(el?: HTMLElement) {
     const { $monthAndYear, $time, $date } = this;
 
-    let day;
+    let day: string;
     if (el) {
-      day = el.textContent!.trim();
+      day = (el.textContent || '').trim();
     } else {
-      day = $date.textContent!.replace(/[a-z]+/, '');
+      day = ($date.textContent || '').replace(/[a-z]+/, '');
     }
 
-    const monthAndYearText = $monthAndYear.textContent!;
-    const [ monthName, year ] = monthAndYearText.split(' ');
+    const monthAndYearText = ($monthAndYear.textContent || '').trim();
+    const parts = monthAndYearText.split(' ');
+    const monthName = parts[0] || '';
+    const year = parts[1] || '0';
     const month = dateUtil.months.indexOf(monthName);
-    const timeText = $time.textContent!;
-    const timeComponents = timeText.split(':');
-    let hours = +timeComponents[0];
-    const [ minutes, meridium ] = timeComponents[1].split(' ');
 
-    if (meridium === 'AM' && hours == 12) {
+    const timeText = ($time.textContent || '').trim();
+    const timeComponents = timeText.split(':');
+    let hours = parseInt(timeComponents[0], 10) || 0;
+    const timePart = (timeComponents[1] || '').split(' ');
+    const minutes = parseInt(timePart[0], 10) || 0;
+    const meridium = timePart[1] || '';
+
+    if (meridium === 'AM' && hours === 12) {
       hours = 0;
     }
 
@@ -295,12 +326,14 @@ class EasyEpoch {
       hours += 12;
     }
 
-    const date = new Date(+year, +month, +day, +hours, +minutes);
+    const dayNum = parseInt(day, 10) || 1;
+    const yearNum = parseInt(year, 10) || new Date().getFullYear();
+    const date = new Date(yearNum, month >= 0 ? month : 0, dayNum, hours, minutes);
     this.selectedDate = date;
 
     let _date = day + ' ';
-    _date += monthAndYearText.trim() + ' ';
-    _date += timeText.trim();
+    _date += monthAndYearText + ' ';
+    _date += timeText;
     this.readableDate = _date.replace(/^\d+/, dateUtil.getDisplayDate(date));
   }
 
