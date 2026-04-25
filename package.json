@@ -45,7 +45,7 @@
   "homepage": "https://github.com/Christian-Oleson/EasyEpoch#readme",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@rspack/cli": "^1.7.5",
+    "@rspack/cli": "^2.0.0",
     "@rspack/core": "^1.7.5",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.1.0",
