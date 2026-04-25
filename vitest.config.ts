@@ -7,5 +7,12 @@ export default defineConfig({
     // Setup file installs fake timers before module imports, ensuring the
     // module-level `const today = new Date()` in index.ts gets a safe date.
     setupFiles: ['tests/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['lib/**/*.ts'],
+      exclude: ['**/*.test.ts', 'tests/**', 'dist/**', 'docs/**'],
+      reportsDirectory: 'coverage',
+    },
   },
 });
