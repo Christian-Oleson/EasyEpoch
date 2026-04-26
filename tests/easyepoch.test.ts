@@ -977,11 +977,87 @@ describe('Bug fixes', () => {
 
     it('honors per-string title overrides distinct from labels', () => {
       const picker = new EasyEpoch({
-        locale: { ok: 'Go', okTitle: 'Confirm selection' },
+        locale: {
+          ok: 'Go', okTitle: 'Confirm selection',
+          cancel: 'Back', cancelTitle: 'Abort selection',
+        },
       });
       const ok = document.querySelector('.easyepoch-ok-btn')!;
+      const cancel = document.querySelector('.easyepoch-cancel-btn')!;
       expect(ok.textContent).toBe('Go');
       expect(ok.getAttribute('title')).toBe('Confirm selection');
+      expect(cancel.textContent).toBe('Back');
+      expect(cancel.getAttribute('title')).toBe('Abort selection');
+    });
+
+    it('mirrors cancel label into cancelTitle when only the label is set', () => {
+      const picker = new EasyEpoch({ locale: { cancel: 'Annuler' } });
+      const cancel = document.querySelector('.easyepoch-cancel-btn')!;
+      expect(cancel.textContent).toBe('Annuler');
+      expect(cancel.getAttribute('title')).toBe('Annuler');
+    });
+
+    it('applies icon-button tooltip overrides', () => {
+      const picker = new EasyEpoch({
+        locale: {
+          selectDateTitle: 'Choisir la date',
+          selectTimeTitle: "Choisir l'heure",
+        },
+      });
+      const calenderIcon = document.querySelector('.easyepoch-icon-calender')!;
+      const timeIcon = document.querySelector('.easyepoch-icon-time')!;
+      expect(calenderIcon.getAttribute('title')).toBe('Choisir la date');
+      expect(timeIcon.getAttribute('title')).toBe("Choisir l'heure");
+    });
+
+    it('default selectDateTitle uses correct "calendar" spelling', () => {
+      const picker = new EasyEpoch();
+      const calenderIcon = document.querySelector('.easyepoch-icon-calender')!;
+      expect(calenderIcon.getAttribute('title')).toBe('Select date from calendar!');
+    });
+
+    it('falls back to defaults when fields are explicitly undefined', () => {
+      // Spread-merge would overwrite defaults with undefined; resolveLocale
+      // must reject undefined entries.
+      const picker = new EasyEpoch({
+        locale: {
+          months: undefined, days: undefined, daysShort: undefined,
+          ok: undefined, cancel: undefined,
+        } as any,
+      });
+      const ths = document.querySelectorAll('.easyepoch-calender thead th');
+      expect(ths[0].textContent).toBe('Sun');
+      expect(document.querySelector('.easyepoch-ok-btn')!.textContent).toBe('OK');
+      expect(document.querySelector('.easyepoch-cancel-btn')!.textContent).toBe('Cancel');
+    });
+
+    it('rejects malformed locale arrays of the wrong length', () => {
+      // Eleven months: invalid. Falls back to default English months.
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15),
+        locale: { months: ['M' + 1, 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11'] } as any,
+      });
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      expect(header.textContent).toContain('June');
+    });
+
+    it('rejects locale arrays containing non-string entries', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15),
+        locale: {
+          months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 12 as any],
+        } as any,
+      });
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      // June is index 5 — would have been valid even with a bad December entry,
+      // but the whole array is rejected. Falls back to "June".
+      expect(header.textContent).toContain('June');
+    });
+
+    it('rejects empty-string overrides', () => {
+      const picker = new EasyEpoch({ locale: { ok: '', cancel: '' } });
+      expect(document.querySelector('.easyepoch-ok-btn')!.textContent).toBe('OK');
+      expect(document.querySelector('.easyepoch-cancel-btn')!.textContent).toBe('Cancel');
     });
 
     it('parses the localized header back into selectedDate after navigation', () => {

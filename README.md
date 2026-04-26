@@ -258,7 +258,7 @@ const picker = new EasyEpoch({
 | `okTitle` | Tooltip on the OK button | Mirrors `ok` if you set `ok`, otherwise English |
 | `cancelTitle` | Tooltip on the Cancel button | Mirrors `cancel` if you set `cancel`, otherwise English |
 
-The time display uses 12-hour `AM` / `PM` suffixes. If you need a 24-hour clock, use the `showSeconds: false` default with the browser's native `<input type="time">` UI which respects the user's locale, or override the rendered text by listening to `submit` and reformatting before display.
+The rendered time display always uses a 12-hour clock with `AM` / `PM` suffixes. `showSeconds` only controls precision, not the clock format. The browser's native `<input type="time">` widget may display in 24-hour form while the user is editing (browsers honor the OS locale here), but EasyEpoch's `selectedDate` is a normal `Date` so you can format it in any timezone/locale yourself in the `submit` handler.
 
 ## Development
 

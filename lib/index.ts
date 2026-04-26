@@ -36,7 +36,7 @@ const defaultLocale: ResolvedLocale = {
   daysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   ok: 'OK',
   cancel: 'Cancel',
-  selectDateTitle: 'Select date from calender!',
+  selectDateTitle: 'Select date from calendar!',
   selectTimeTitle: 'Select time',
   okTitle: 'OK',
   cancelTitle: 'Cancel',
@@ -215,16 +215,41 @@ class EasyEpoch {
   }
 
   private resolveLocale(input?: EasyEpochLocale): ResolvedLocale {
-    const merged: ResolvedLocale = { ...defaultLocale, ...(input || {}) };
-    // If a label is overridden but its tooltip is not, mirror the label so the
-    // tooltip stays in the user's language rather than reverting to English.
-    if (input && input.ok !== undefined && input.okTitle === undefined) {
-      merged.okTitle = input.ok;
-    }
-    if (input && input.cancel !== undefined && input.cancelTitle === undefined) {
-      merged.cancelTitle = input.cancel;
-    }
-    return merged;
+    // Build the merged locale explicitly rather than spreading. The spread
+    // approach would let `{ months: undefined }` blow away the default and
+    // leave updateDateComponents/updateSelectedDate indexing into undefined.
+    // We accept a per-field override only if it's a non-undefined value of
+    // the right shape; otherwise we keep the default.
+    const validArr = (v: unknown, length: number): string[] | undefined => {
+      if (!Array.isArray(v) || v.length !== length) return undefined;
+      // All entries must be strings; one bad entry would surface as undefined later.
+      for (let i = 0; i < length; i++) {
+        if (typeof v[i] !== 'string') return undefined;
+      }
+      return v as string[];
+    };
+    const validStr = (v: unknown): string | undefined =>
+      typeof v === 'string' && v.length > 0 ? v : undefined;
+
+    const i = input || {};
+    const months = validArr(i.months, 12) ?? defaultLocale.months;
+    const days = validArr(i.days, 7) ?? defaultLocale.days;
+    const daysShort = validArr(i.daysShort, 7) ?? defaultLocale.daysShort;
+    const ok = validStr(i.ok) ?? defaultLocale.ok;
+    const cancel = validStr(i.cancel) ?? defaultLocale.cancel;
+
+    // Mirror label -> title when the user provides only the label, so tooltips
+    // don't revert to English on hover.
+    const okTitle = validStr(i.okTitle) ?? (validStr(i.ok) !== undefined ? ok : defaultLocale.okTitle);
+    const cancelTitle = validStr(i.cancelTitle) ?? (validStr(i.cancel) !== undefined ? cancel : defaultLocale.cancelTitle);
+    const selectDateTitle = validStr(i.selectDateTitle) ?? defaultLocale.selectDateTitle;
+    const selectTimeTitle = validStr(i.selectTimeTitle) ?? defaultLocale.selectTimeTitle;
+
+    return {
+      months, days, daysShort,
+      ok, cancel,
+      selectDateTitle, selectTimeTitle, okTitle, cancelTitle,
+    };
   }
 
   private applyLocaleStrings() {
