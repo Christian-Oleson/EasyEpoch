@@ -90,6 +90,22 @@ picker.on('submit', (date, readable) => {
 });
 ```
 
+### Keyboard shortcuts
+
+While the picker is open, the following shortcuts are available:
+
+| Key | Action |
+|---|---|
+| `←` / `→` | Move the selection back/forward by one day |
+| `↑` / `↓` | Move the selection back/forward by one week |
+| `Home` / `End` | Jump to the first / last day of the current month |
+| `PageUp` / `PageDown` | Move back/forward by one month |
+| `Shift` + `PageUp` / `PageDown` | Move back/forward by one year |
+| `Enter` | Submit the current selection (same as `OK`) |
+| `Escape` | Cancel and close (same as `Cancel`) |
+
+Arrow keys are not intercepted while the time input has focus, so users can edit hours/minutes with the keyboard normally. Out-of-range cells (see `minDate` / `maxDate`) are skipped.
+
 ### `picker.open()`
 
 Opens the picker. The picker closes automatically when the user clicks `Cancel` or the overlay, triggering the `close` event. If the user selects a date, the `submit` event fires instead.

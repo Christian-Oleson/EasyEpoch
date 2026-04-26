@@ -912,4 +912,175 @@ describe('Bug fixes', () => {
       expect(timeEl.textContent).toMatch(/^\d{2}:\d{2}\s(AM|PM)$/);
     });
   });
+
+  describe('keyboard navigation (issue #1)', () => {
+    function key(name: string, opts: { shiftKey?: boolean } = {}) {
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: name, bubbles: true, cancelable: true, ...opts,
+      }));
+    }
+
+    it('ArrowRight advances the selected date by one day', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('ArrowRight');
+      expect(picker.selectedDate.getDate()).toBe(16);
+      expect(picker.selectedDate.getMonth()).toBe(5);
+    });
+
+    it('ArrowLeft moves the selected date back by one day', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('ArrowLeft');
+      expect(picker.selectedDate.getDate()).toBe(14);
+    });
+
+    it('ArrowDown advances by 7 days', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('ArrowDown');
+      expect(picker.selectedDate.getDate()).toBe(22);
+    });
+
+    it('ArrowUp moves back by 7 days', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('ArrowUp');
+      expect(picker.selectedDate.getDate()).toBe(8);
+    });
+
+    it('ArrowRight on the last day of the month rolls into the next month', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 0, 31) });
+      picker.open();
+      key('ArrowRight');
+      expect(picker.selectedDate.getMonth()).toBe(1); // February
+      expect(picker.selectedDate.getDate()).toBe(1);
+      // Rendered calendar header should reflect the new month
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      expect(header.textContent).toContain('February');
+    });
+
+    it('ArrowLeft on day 1 rolls into the previous month', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 1) });
+      picker.open();
+      key('ArrowLeft');
+      expect(picker.selectedDate.getMonth()).toBe(4); // May
+      expect(picker.selectedDate.getDate()).toBe(31);
+    });
+
+    it('PageDown advances by one month', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('PageDown');
+      expect(picker.selectedDate.getMonth()).toBe(6); // July
+      expect(picker.selectedDate.getDate()).toBe(15);
+    });
+
+    it('PageUp moves back one month', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('PageUp');
+      expect(picker.selectedDate.getMonth()).toBe(4); // May
+    });
+
+    it('PageDown clamps day when target month is shorter (Jan 31 -> Feb 28/29)', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2023, 0, 31) });
+      picker.open();
+      key('PageDown');
+      // 2023 is not a leap year -> Feb 28
+      expect(picker.selectedDate.getMonth()).toBe(1);
+      expect(picker.selectedDate.getDate()).toBe(28);
+    });
+
+    it('Shift+PageDown advances by one year', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('PageDown', { shiftKey: true });
+      expect(picker.selectedDate.getFullYear()).toBe(2025);
+      expect(picker.selectedDate.getMonth()).toBe(5);
+    });
+
+    it('Home moves to the first day of the current month', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('Home');
+      expect(picker.selectedDate.getDate()).toBe(1);
+      expect(picker.selectedDate.getMonth()).toBe(5);
+    });
+
+    it('End moves to the last day of the current month', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('End');
+      expect(picker.selectedDate.getDate()).toBe(30); // June has 30 days
+    });
+
+    it('Enter triggers submit and closes the picker', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      const handler = vi.fn();
+      picker.on('submit', handler);
+      picker.open();
+      key('Enter');
+      expect(handler).toHaveBeenCalledTimes(1);
+      const wrapper = document.querySelector('.easyepoch-wrapper')!;
+      expect(wrapper.classList.contains('active')).toBe(false);
+    });
+
+    it('Escape triggers close (not submit)', () => {
+      const picker = new EasyEpoch();
+      const submit = vi.fn();
+      const close = vi.fn();
+      picker.on('submit', submit);
+      picker.on('close', close);
+      picker.open();
+      key('Escape');
+      expect(submit).not.toHaveBeenCalled();
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not handle keys when the picker is closed', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      const before = picker.selectedDate.getDate();
+      // never opened
+      key('ArrowRight');
+      expect(picker.selectedDate.getDate()).toBe(before);
+    });
+
+    it('does not hijack ArrowRight while typing in the time input', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      const before = picker.selectedDate.getDate();
+      const input = document.querySelector('.easyepoch-time-section input') as HTMLInputElement;
+      input.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'ArrowRight', bubbles: true, cancelable: true,
+      }));
+      expect(picker.selectedDate.getDate()).toBe(before);
+    });
+
+    it('refuses to move into a disabled (out-of-range) cell', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 10),
+        minDate: new Date(2024, 5, 10),
+      });
+      picker.open();
+      key('ArrowLeft'); // would move to June 9 — disabled
+      expect(picker.selectedDate.getDate()).toBe(10);
+    });
+
+    it('routes keys only to the open picker when multiple instances exist (issue #63)', () => {
+      const div1 = document.createElement('div');
+      document.body.appendChild(div1);
+      const div2 = document.createElement('div');
+      document.body.appendChild(div2);
+
+      const start = new Date(2024, 5, 15);
+      const picker1 = new EasyEpoch(div1, { selectedDate: start });
+      const picker2 = new EasyEpoch(div2, { selectedDate: start });
+
+      picker1.open(); // picker2 stays closed
+      key('ArrowRight');
+      expect(picker1.selectedDate.getDate()).toBe(16);
+      expect(picker2.selectedDate.getDate()).toBe(15);
+    });
+  });
 });

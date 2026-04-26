@@ -71,6 +71,12 @@ declare class EasyEpoch {
     findElementWithDate(date: string, returnLastIfNotFound?: boolean): HTMLElement | undefined;
     handleIconButtonClick(el: HTMLElement): void;
     initListeners(): void;
+    private submit;
+    private cancelClose;
+    private handleKeydown;
+    private shiftSelectedDateBy;
+    private moveSelectionToDayOfMonth;
+    private moveSelectionTo;
     callEvent(event: EasyEpochEvent, dispatcher: (a: HandlerFunction) => void): void;
     open(): void;
     close(): void;
