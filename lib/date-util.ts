@@ -138,18 +138,18 @@ export function getDisplayDate(_date: Date) {
   return date + 'th';
 }
 
-export function formatTimeFromInputElement(input: string) {
+export function formatTimeFromInputElement(input: string, showSeconds: boolean = false) {
   const parts = input.split(':');
-  if (parts.length < 2) return '12:00 PM';
+  if (parts.length < 2) return showSeconds ? '12:00:00 PM' : '12:00 PM';
 
   let hour = parseInt(parts[0], 10);
   const minuteRaw = parseInt(parts[1], 10);
+  const secondRaw = showSeconds ? parseInt(parts[2] || '0', 10) : 0;
 
   // Clamp to valid ranges to prevent invalid Date construction
   if (isNaN(hour) || hour < 0 || hour > 23) hour = 0;
   const minute = isNaN(minuteRaw) || minuteRaw < 0 || minuteRaw > 59 ? 0 : minuteRaw;
-
-  let timeString = '';
+  const second = isNaN(secondRaw) || secondRaw < 0 || secondRaw > 59 ? 0 : secondRaw;
 
   const isPM = hour >= 12;
   if (isPM && hour > 12) {
@@ -160,8 +160,9 @@ export function formatTimeFromInputElement(input: string) {
     hour = 12;
   }
 
-  timeString += hour < 10 ? '0' + hour : hour;
-  timeString += ':' + (minute < 10 ? '0' + minute : minute) + ' ';
-  timeString += isPM ? 'PM' : 'AM';
+  const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+  let timeString = pad(hour) + ':' + pad(minute);
+  if (showSeconds) timeString += ':' + pad(second);
+  timeString += ' ' + (isPM ? 'PM' : 'AM');
   return timeString;
 }

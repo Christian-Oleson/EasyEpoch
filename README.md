@@ -38,12 +38,15 @@ TypeScript declaration files are included with the package.
 
 Creates a new picker instance and inserts it into the DOM.
 
-- `el` (optional, `string` | `Element`) - A CSS selector or DOM element to bind the picker to. Defaults to `body`.
+- `el` (optional, `string` | `Element`) - The container element the picker is **appended to** (it does *not* replace the contents of `el`). Accepts a CSS selector string, a real DOM element, or omits to default to `<body>`. Each picker creates its own `.easyepoch-wrapper` overlay inside the container.
 - `opts` (optional, `object`) - Configuration options:
   - `zIndex` (`number`): Sets the `z-index` for the picker.
-  - `disableTimeSection` (`boolean`): If `true`, disables the time picker section.
+  - `disableTimeSection` (`boolean`): If `true`, fully hides the time UI and excludes time from `selectedDate` (set to `00:00:00`) and from `readableDate`.
   - `compactMode` (`boolean`): If `true`, hides the large selected-date display for a more compact layout.
   - `selectedDate` (`Date`): Initialize the picker with this date. Defaults to today.
+  - `minDate` (`Date`): Earliest selectable date (inclusive, by calendar day). Cells before this date are visually disabled and ignore clicks.
+  - `maxDate` (`Date`): Latest selectable date (inclusive, by calendar day). Cells after this date are visually disabled and ignore clicks.
+  - `showSeconds` (`boolean`): If `true`, the time picker accepts seconds and `selectedDate` / `readableDate` retain second-level precision.
   - `theme` (`'light'` | `'dark'` | `Record<string, string>`): Sets the color theme. Defaults to `'dark'`. See [Theming](#theming).
 
 The first argument can be `opts` directly if no element is needed.
@@ -52,11 +55,39 @@ The first argument can be `opts` directly if no element is needed.
 const picker = new EasyEpoch();
 ```
 
+`el` is the **mount point**, not the trigger. To open the picker on demand, wire up your own event:
+
+```javascript
+const picker = new EasyEpoch();
+document.querySelector('#open-picker').addEventListener('click', () => picker.open());
+```
+
 To use multiple pickers on the same page, each must be bound to a different element:
 
 ```javascript
 const picker1 = new EasyEpoch();
 const picker2 = new EasyEpoch('.another-element');
+```
+
+Restricting selection to a date range:
+
+```javascript
+const today = new Date();
+const oneYearFromNow = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+const picker = new EasyEpoch({
+  minDate: today,
+  maxDate: oneYearFromNow,
+});
+```
+
+Capturing seconds in the selected time:
+
+```javascript
+const picker = new EasyEpoch({ showSeconds: true });
+picker.on('submit', (date, readable) => {
+  console.log(date.getSeconds()); // preserved
+  console.log(readable);          // e.g. "1st January 2024 02:30:45 PM"
+});
 ```
 
 ### `picker.open()`

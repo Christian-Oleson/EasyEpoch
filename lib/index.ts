@@ -11,6 +11,9 @@ interface EasyEpochOpts {
   disableTimeSection?: boolean;
   selectedDate?: Date;
   theme?: EasyEpochTheme;
+  minDate?: Date;
+  maxDate?: Date;
+  showSeconds?: boolean;
 }
 
 const validListeners = [
@@ -49,7 +52,13 @@ class EasyEpoch {
   private $ok: HTMLElement;
   private $displayDateElements: HTMLElement[];
   private $activeCell: HTMLElement | null;
+  private $timeSection: HTMLElement;
+  private $timeDisplay: HTMLElement;
   private monthTracker: MonthTracker;
+  private timeSectionDisabled: boolean;
+  private showSeconds: boolean;
+  private minDate?: Date;
+  private maxDate?: Date;
 
   constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts) {
     let el: HTMLElement | undefined = undefined;
@@ -109,7 +118,9 @@ class EasyEpoch {
     this.$day = $('.easyepoch-day-header');
     this.$time = $('.easyepoch-time');
     this.$timeInput = $('.easyepoch-time-section input');
+    this.$timeSection = $('.easyepoch-time-section');
     this.$timeSectionIcon = $('.easyepoch-icon-time');
+    this.$timeDisplay = $('.easyepoch-time');
     this.$cancel = $('.easyepoch-cancel-btn');
     this.$ok = $('.easyepoch-ok-btn');
 
@@ -128,6 +139,16 @@ class EasyEpoch {
     opts = opts || {};
     this.opts = opts;
 
+    this.timeSectionDisabled = false;
+    this.showSeconds = opts.showSeconds === true;
+    this.minDate = opts.minDate ? this.startOfDay(opts.minDate) : undefined;
+    this.maxDate = opts.maxDate ? this.startOfDay(opts.maxDate) : undefined;
+
+    if (this.showSeconds) {
+      this.$timeInput.setAttribute('step', '1');
+      this.$timeInput.value = '12:00:00';
+    }
+
     this.reset(opts.selectedDate || now);
 
     if (opts.zIndex !== undefined) {
@@ -145,17 +166,30 @@ class EasyEpoch {
     this.setTheme(opts.theme || 'dark');
   }
 
+  private startOfDay(d: Date): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  private isDateOutOfRange(year: number, month: number, day: number): boolean {
+    if (!this.minDate && !this.maxDate) return false;
+    const ts = new Date(year, month, day).getTime();
+    if (this.minDate && ts < this.minDate.getTime()) return true;
+    if (this.maxDate && ts > this.maxDate.getTime()) return true;
+    return false;
+  }
+
   // Reset by selecting current date.
   reset(newDate?: Date) {
     const date = newDate || new Date();
     this.render(dateUtil.scrapeMonth(date, this.monthTracker));
 
-    // The timeFull variable below will be formatted as HH:mm:ss.
-    // Using regular experssion we remove the :ss parts.
-    const timeFull = date.toTimeString().split(" ")[0]
-    const time = timeFull.replace(/:\d\d$/, "");
+    // toTimeString() yields "HH:MM:SS GMT…". Take just the clock part.
+    // When showSeconds is off we strip the trailing :SS so the <input type="time">
+    // value matches its (default) HH:MM precision.
+    const timeFull = date.toTimeString().split(' ')[0];
+    const time = this.showSeconds ? timeFull : timeFull.replace(/:\d\d$/, '');
     this.$timeInput.value = time;
-    this.$time.textContent = dateUtil.formatTimeFromInputElement(time);
+    this.$time.textContent = dateUtil.formatTimeFromInputElement(time, this.showSeconds);
 
     const dateString = date.getDate().toString();
     const $dateEl = this.findElementWithDate(dateString);
@@ -171,13 +205,27 @@ class EasyEpoch {
   }
 
   disableTimeSection() {
-    const { $timeSectionIcon } = this;
-    $timeSectionIcon.style.visibility = 'hidden';
+    this.timeSectionDisabled = true;
+    this.$timeSectionIcon.style.display = 'none';
+    this.$timeDisplay.style.display = 'none';
+    this.$timeSection.style.display = 'none';
+    // Force the calendar pane to be the visible one so the user can't be stranded
+    // on a hidden time pane if disable was toggled while time was active.
+    const calenderIcon = this.$('.easyepoch-icon-calender');
+    const timeIcon = this.$('.easyepoch-icon-time');
+    const calenderSection = this.$('.easyepoch-calender-section');
+    if (calenderIcon) calenderIcon.classList.add('active');
+    if (timeIcon) timeIcon.classList.remove('active');
+    if (calenderSection) calenderSection.style.display = 'block';
+    this.updateSelectedDate();
   }
 
   enableTimeSection() {
-    const { $timeSectionIcon } = this;
-    $timeSectionIcon.style.visibility = 'visible';
+    this.timeSectionDisabled = false;
+    this.$timeSectionIcon.style.display = '';
+    this.$timeDisplay.style.display = '';
+    // The time section itself stays display:none until the user clicks the time icon.
+    this.updateSelectedDate();
   }
 
   // Allowed CSS custom property name pattern: only alphanumeric, hyphens, and underscores.
@@ -264,19 +312,26 @@ class EasyEpoch {
   render(data: { month: unknown[][]; date: Date }) {
     const { $trs, $lastRow } = this;
     const { month, date } = data;
+    const renderedYear = date.getFullYear();
+    const renderedMonth = date.getMonth();
 
     this.clearRows();
     month.forEach((week, index) => {
       const $tds = $trs[index].children;
       week.forEach((day, index) => {
         const td = $tds[index];
+        td.removeAttribute('data-disabled');
         if (!day) {
           td.setAttribute('data-empty', '');
           return;
         }
 
         td.removeAttribute('data-empty');
-        td.textContent = day;
+        td.textContent = day as string;
+
+        if (this.isDateOutOfRange(renderedYear, renderedMonth, day as number)) {
+          td.setAttribute('data-disabled', '');
+        }
       });
     });
 
@@ -311,29 +366,41 @@ class EasyEpoch {
     const year = parts[1] || '0';
     const month = dateUtil.months.indexOf(monthName);
 
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
     const timeText = ($time.textContent || '').trim();
-    const timeComponents = timeText.split(':');
-    let hours = parseInt(timeComponents[0], 10) || 0;
-    const timePart = (timeComponents[1] || '').split(' ');
-    const minutes = parseInt(timePart[0], 10) || 0;
-    const meridium = timePart[1] || '';
 
-    if (meridium === 'AM' && hours === 12) {
-      hours = 0;
-    }
-
-    if (meridium === 'PM' && hours < 12) {
-      hours += 12;
+    if (!this.timeSectionDisabled) {
+      const timeComponents = timeText.split(':');
+      hours = parseInt(timeComponents[0], 10) || 0;
+      const minutePart = timeComponents[1] || '';
+      // With seconds: "MM" then "SS AM/PM"; without seconds: "MM AM/PM".
+      if (this.showSeconds && timeComponents.length >= 3) {
+        minutes = parseInt(minutePart, 10) || 0;
+        const secPart = (timeComponents[2] || '').split(' ');
+        seconds = parseInt(secPart[0], 10) || 0;
+        const meridium = secPart[1] || '';
+        if (meridium === 'AM' && hours === 12) hours = 0;
+        if (meridium === 'PM' && hours < 12) hours += 12;
+      } else {
+        const minSplit = minutePart.split(' ');
+        minutes = parseInt(minSplit[0], 10) || 0;
+        const meridium = minSplit[1] || '';
+        if (meridium === 'AM' && hours === 12) hours = 0;
+        if (meridium === 'PM' && hours < 12) hours += 12;
+      }
     }
 
     const dayNum = parseInt(day, 10) || 1;
     const yearNum = parseInt(year, 10) || new Date().getFullYear();
-    const date = new Date(yearNum, month >= 0 ? month : 0, dayNum, hours, minutes);
+    const date = new Date(yearNum, month >= 0 ? month : 0, dayNum, hours, minutes, seconds);
     this.selectedDate = date;
 
-    let _date = day + ' ';
-    _date += monthAndYearText + ' ';
-    _date += timeText;
+    let _date = day + ' ' + monthAndYearText;
+    if (!this.timeSectionDisabled) {
+      _date += ' ' + timeText;
+    }
     this.readableDate = _date.replace(/^\d+/, dateUtil.getDisplayDate(date));
   }
 
@@ -431,7 +498,9 @@ class EasyEpoch {
       const tagName = target.tagName.toLowerCase();
 
       e.stopPropagation();
-      if (tagName === 'td' && target.dataset.empty === undefined) {
+      if (tagName === 'td'
+          && target.dataset.empty === undefined
+          && target.dataset.disabled === undefined) {
         this.selectDateElement(target);
         return;
       }
@@ -444,11 +513,12 @@ class EasyEpoch {
     });
 
     $timeInput.addEventListener('input', (e: Event) => {
-      if ((e.target as HTMLInputElement).value === '') {
+      const value = (e.target as HTMLInputElement).value;
+      if (value === '') {
         return;
       }
 
-      const formattedTime = dateUtil.formatTimeFromInputElement((e.target as HTMLInputElement).value);
+      const formattedTime = dateUtil.formatTimeFromInputElement(value, this.showSeconds);
       this.$time.textContent = formattedTime;
       this.updateSelectedDate();
     });
