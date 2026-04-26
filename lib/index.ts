@@ -523,20 +523,131 @@ class EasyEpoch {
       this.updateSelectedDate();
     });
 
-    $ok.addEventListener('click', () => {
-      this.close();
-      this.callEvent('submit', (func) => {
-        func(this.selectedDate, this.readableDate);
-      });
+    $ok.addEventListener('click', () => this.submit());
+    $cancel.addEventListener('click', () => this.cancelClose());
+    $easyepochWrapper.addEventListener('click', () => this.cancelClose());
+
+    document.addEventListener('keydown', this.handleKeydown);
+  }
+
+  private submit() {
+    this.close();
+    this.callEvent('submit', (func) => {
+      func(this.selectedDate, this.readableDate);
     });
+  }
 
-    const close = () => {
-      this.close();
-      this.callEvent('close', (f) => { f() });
-    };
+  private cancelClose() {
+    this.close();
+    this.callEvent('close', (f) => { f(); });
+  }
 
-    $cancel.addEventListener('click', close);
-    $easyepochWrapper.addEventListener('click', close);
+  // Bound on construction so we have a stable reference (and `this` binding)
+  // for both addEventListener and removeEventListener.
+  private handleKeydown = (e: KeyboardEvent) => {
+    // Only the picker whose overlay is currently active handles keys. Multiple
+    // instances on the same page each register this listener; the gate ensures
+    // a keystroke only routes to the visible picker.
+    if (!this.$easyepochWrapper.classList.contains('active')) return;
+
+    // Don't hijack arrows / Enter while the user is editing the time input.
+    const target = e.target as HTMLElement | null;
+    if (target && target.tagName === 'INPUT') return;
+
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        this.cancelClose();
+        return;
+      case 'Enter':
+        e.preventDefault();
+        this.submit();
+        return;
+      case 'ArrowLeft':
+        e.preventDefault();
+        this.shiftSelectedDateBy(-1);
+        return;
+      case 'ArrowRight':
+        e.preventDefault();
+        this.shiftSelectedDateBy(1);
+        return;
+      case 'ArrowUp':
+        e.preventDefault();
+        this.shiftSelectedDateBy(-7);
+        return;
+      case 'ArrowDown':
+        e.preventDefault();
+        this.shiftSelectedDateBy(7);
+        return;
+      case 'PageUp':
+        e.preventDefault();
+        this.shiftSelectedDateBy(0, e.shiftKey ? -12 : -1);
+        return;
+      case 'PageDown':
+        e.preventDefault();
+        this.shiftSelectedDateBy(0, e.shiftKey ? 12 : 1);
+        return;
+      case 'Home':
+        e.preventDefault();
+        this.moveSelectionToDayOfMonth(1);
+        return;
+      case 'End':
+        e.preventDefault();
+        this.moveSelectionToDayOfMonth(0, true); // last day of month
+        return;
+    }
+  };
+
+  private shiftSelectedDateBy(days: number, months: number = 0) {
+    const d = this.selectedDate;
+    let target: Date;
+    if (months !== 0 && days === 0) {
+      // Pure month nav: clamp day to target month's last day so Jan 31 + 1 month
+      // lands on Feb 28/29 rather than overflowing into March.
+      const targetMonth = d.getMonth() + months;
+      const targetYear = d.getFullYear();
+      const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const day = Math.min(d.getDate(), lastDay);
+      target = new Date(
+        targetYear, targetMonth, day,
+        d.getHours(), d.getMinutes(), d.getSeconds()
+      );
+    } else {
+      target = new Date(
+        d.getFullYear(), d.getMonth() + months, d.getDate() + days,
+        d.getHours(), d.getMinutes(), d.getSeconds()
+      );
+    }
+    this.moveSelectionTo(target);
+  }
+
+  private moveSelectionToDayOfMonth(day: number, lastDayOfMonth: boolean = false) {
+    const d = this.selectedDate;
+    const target = lastDayOfMonth
+      // Day 0 of month+1 = last day of current month.
+      ? new Date(d.getFullYear(), d.getMonth() + 1, 0, d.getHours(), d.getMinutes(), d.getSeconds())
+      : new Date(d.getFullYear(), d.getMonth(), day, d.getHours(), d.getMinutes(), d.getSeconds());
+    this.moveSelectionTo(target);
+  }
+
+  private moveSelectionTo(target: Date) {
+    if (this.isDateOutOfRange(target.getFullYear(), target.getMonth(), target.getDate())) {
+      // Refuse to move into a disabled cell.
+      return;
+    }
+
+    const cur = this.selectedDate;
+    if (
+      target.getFullYear() !== cur.getFullYear() ||
+      target.getMonth() !== cur.getMonth()
+    ) {
+      this.render(dateUtil.scrapeMonth(target, this.monthTracker));
+    }
+
+    const $el = this.findElementWithDate(target.getDate().toString());
+    if (!$el) return;
+    if ($el.dataset.disabled !== undefined) return;
+    this.selectDateElement($el);
   }
 
   callEvent(event: EasyEpochEvent, dispatcher: (a: HandlerFunction) => void) {
