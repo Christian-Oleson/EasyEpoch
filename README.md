@@ -47,6 +47,7 @@ Creates a new picker instance and inserts it into the DOM.
   - `minDate` (`Date`): Earliest selectable date (inclusive, by calendar day). Cells before this date are visually disabled and ignore clicks.
   - `maxDate` (`Date`): Latest selectable date (inclusive, by calendar day). Cells after this date are visually disabled and ignore clicks.
   - `showSeconds` (`boolean`): If `true`, the time picker accepts seconds and `selectedDate` / `readableDate` retain second-level precision.
+  - `locale` (`object`): Translates labels and day/month names. See [Localization](#localization). Defaults to English.
   - `theme` (`'light'` | `'dark'` | `Record<string, string>`): Sets the color theme. Defaults to `'dark'`. See [Theming](#theming).
 
 The first argument can be `opts` directly if no element is needed.
@@ -222,6 +223,42 @@ You can also override variables directly in your own stylesheet without any Java
 | `--easyepoch-cell-active-text` | Active/selected cell text color |
 | `--easyepoch-input-border` | Time input border color |
 | `--easyepoch-btn-hover-text` | Button hover text color |
+
+## Localization
+
+EasyEpoch ships with English defaults but every visible string can be replaced via the `locale` option. Anything you don't override falls back to the English default.
+
+```javascript
+const picker = new EasyEpoch({
+  locale: {
+    months: [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+    ],
+    days: [
+      'Dimanche', 'Lundi', 'Mardi', 'Mercredi',
+      'Jeudi', 'Vendredi', 'Samedi',
+    ],
+    daysShort: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+    ok: 'Valider',
+    cancel: 'Annuler',
+  },
+});
+```
+
+| Field | Used for | Default |
+|---|---|---|
+| `months` | Month name in the date header (12 entries, January..December order) | English month names |
+| `days` | Day-of-week label above the calendar (7 entries, Sunday..Saturday order) | English day names |
+| `daysShort` | Calendar table column headers (7 entries, Sunday..Saturday order) | `Sun..Sat` |
+| `ok` | OK button label | `OK` |
+| `cancel` | Cancel button label | `Cancel` |
+| `selectDateTitle` | Tooltip on the calendar-icon toggle button | English |
+| `selectTimeTitle` | Tooltip on the time-icon toggle button | English |
+| `okTitle` | Tooltip on the OK button | Mirrors `ok` if you set `ok`, otherwise English |
+| `cancelTitle` | Tooltip on the Cancel button | Mirrors `cancel` if you set `cancel`, otherwise English |
+
+The rendered time display always uses a 12-hour clock with `AM` / `PM` suffixes. `showSeconds` only controls precision, not the clock format. The browser's native `<input type="time">` widget may display in 24-hour form while the user is editing (browsers honor the OS locale here), but EasyEpoch's `selectedDate` is a normal `Date` so you can format it in any timezone/locale yourself in the `submit` handler.
 
 ## Development
 

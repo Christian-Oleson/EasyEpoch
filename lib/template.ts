@@ -15,7 +15,7 @@ export const htmlTemplate = `
         <div class="easyepoch-month-and-year"></div>
         <div class="easyepoch-date"></div>
         <div class="easyepoch-select-pane">
-          <button type="button" class="easyepoch-icon easyepoch-icon-calender active" title="Select date from calender!">${iconCalender}</button>
+          <button type="button" class="easyepoch-icon easyepoch-icon-calender active" title="Select date from calendar!">${iconCalender}</button>
           <div class="easyepoch-time">12:00 PM</div>
           <button type="button" class="easyepoch-icon easyepoch-icon-time" title="Select time">${iconTime}</button>
         </div>
