@@ -260,6 +260,57 @@
       color: #64748b;
       margin-bottom: 24px;
     }
+
+    .kbd-grid {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 10px 18px;
+      align-items: center;
+    }
+
+    kbd {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.8rem;
+      color: #c4b5fd;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .kbd-grid .kbd-keys {
+      white-space: nowrap;
+    }
+
+    .kbd-grid .kbd-keys kbd + kbd {
+      margin-left: 4px;
+    }
+
+    .kbd-grid .kbd-desc {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .demo-select {
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      background: rgba(255, 255, 255, 0.04);
+      color: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .demo-select:focus {
+      outline: none;
+      border-color: rgba(124, 58, 237, 0.5);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    }
   </style>
 </head>
 <body>
@@ -331,7 +382,36 @@ document.<span class="code-function">querySelector</span>(<span class="code-stri
 });</div>
   </div>
 
-  <!-- Example 2: Bound to Element -->
+  <!-- Keyboard shortcuts cheatsheet -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Keyboard Shortcuts</h2>
+      <p>Every picker on the page supports keyboard navigation while open. Try opening any demo and pressing the keys below.</p>
+    </div>
+    <div class="example-demo">
+      <div class="kbd-grid">
+        <span class="kbd-keys"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span>
+        <span class="kbd-desc">Move the selection back / forward by one day</span>
+        <span class="kbd-keys"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span>
+        <span class="kbd-desc">Move by one week</span>
+        <span class="kbd-keys"><kbd>Home</kbd> <kbd>End</kbd></span>
+        <span class="kbd-desc">Jump to the first / last day of the visible month</span>
+        <span class="kbd-keys"><kbd>PgUp</kbd> <kbd>PgDn</kbd></span>
+        <span class="kbd-desc">Move by one month (clamps to last valid day)</span>
+        <span class="kbd-keys"><kbd>Shift</kbd>+<kbd>PgUp</kbd> / <kbd>PgDn</kbd></span>
+        <span class="kbd-desc">Move by one year</span>
+        <span class="kbd-keys"><kbd>Enter</kbd></span>
+        <span class="kbd-desc">Submit (same as OK)</span>
+        <span class="kbd-keys"><kbd>Esc</kbd></span>
+        <span class="kbd-desc">Cancel and close</span>
+      </div>
+    </div>
+    <div class="example-code"><span class="code-comment">// Arrow keys are not intercepted while the time input has focus,</span>
+<span class="code-comment">// so users can edit hours/minutes normally. Out-of-range cells</span>
+<span class="code-comment">// (see minDate / maxDate) are skipped automatically.</span></div>
+  </div>
+
+  <!-- Example: Bound to Element -->
   <div class="example">
     <div class="example-header">
       <h2>Bound to Element</h2>
@@ -410,11 +490,79 @@ picker.<span class="code-function">on</span>(<span class="code-string">'submit'<
 });</div>
   </div>
 
-  <!-- Example 6: Multiple Pickers -->
+  <!-- Example: Date Range (minDate / maxDate) -->
   <div class="example">
     <div class="example-header">
-      <h2>Multiple Pickers</h2>
-      <p>Use two separate picker instances for a start and end date range.</p>
+      <h2>Date Range Limits</h2>
+      <p>Constrain selectable dates with <code>minDate</code> and <code>maxDate</code>. Out-of-range cells are visually disabled and ignore clicks.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="range-btn">Open Picker (today &rarr; +30 days)</button>
+      <div class="demo-output" id="range-output">Past dates and dates more than 30 days out are disabled...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> today = <span class="code-keyword">new</span> <span class="code-function">Date</span>();
+<span class="code-keyword">const</span> in30 = <span class="code-keyword">new</span> <span class="code-function">Date</span>(today.<span class="code-function">getFullYear</span>(), today.<span class="code-function">getMonth</span>(), today.<span class="code-function">getDate</span>() + <span class="code-number">30</span>);
+
+<span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>({
+  minDate: today,
+  maxDate: in30,
+});</div>
+  </div>
+
+  <!-- Example: Seconds Precision (showSeconds) -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Seconds Precision</h2>
+      <p>Set <code>showSeconds: true</code> to capture second-level precision in the time picker. Seconds appear in <code>selectedDate</code> and <code>readableDate</code>.</p>
+    </div>
+    <div class="example-demo">
+      <button class="demo-btn" id="seconds-btn">Open Picker (with seconds)</button>
+      <div class="demo-output" id="seconds-output">Click the button to pick a date with HH:MM:SS time...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>({
+  showSeconds: <span class="code-keyword">true</span>,
+});
+
+picker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+  console.<span class="code-function">log</span>(date.<span class="code-function">getSeconds</span>()); <span class="code-comment">// preserved</span>
+  console.<span class="code-function">log</span>(readableDate);          <span class="code-comment">// e.g. "1st June 2024 02:30:45 PM"</span>
+});</div>
+  </div>
+
+  <!-- Example: Localization (locale) -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Localization</h2>
+      <p>Translate every visible string via the <code>locale</code> option. Anything you don't override falls back to English.</p>
+    </div>
+    <div class="example-demo">
+      <div class="demo-row">
+        <select id="locale-lang" class="demo-select">
+          <option value="en">English</option>
+          <option value="fr">Fran&ccedil;ais</option>
+          <option value="es">Espa&ntilde;ol</option>
+          <option value="de">Deutsch</option>
+        </select>
+        <button class="demo-btn" id="locale-btn">Open Picker</button>
+      </div>
+      <div class="demo-output" id="locale-output">Pick a language, then open the picker...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>({
+  locale: {
+    months: [<span class="code-string">'Janvier'</span>, <span class="code-string">'F&eacute;vrier'</span>, <span class="code-string">'Mars'</span>, <span class="code-comment">/* ... */</span>],
+    days: [<span class="code-string">'Dimanche'</span>, <span class="code-string">'Lundi'</span>, <span class="code-string">'Mardi'</span>, <span class="code-comment">/* ... */</span>],
+    daysShort: [<span class="code-string">'Dim'</span>, <span class="code-string">'Lun'</span>, <span class="code-string">'Mar'</span>, <span class="code-comment">/* ... */</span>],
+    ok: <span class="code-string">'Valider'</span>,
+    cancel: <span class="code-string">'Annuler'</span>,
+  },
+});</div>
+  </div>
+
+  <!-- Example: Linked Pickers (start / end) -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Linked Date Range Pickers</h2>
+      <p>Wire two pickers together so the end date is always &ge; start date. <code>EasyEpoch.linkRange()</code> is sugar for <code>linkAfter</code> + <code>linkBefore</code>.</p>
     </div>
     <div class="example-demo">
       <div class="demo-row">
@@ -429,16 +577,42 @@ picker.<span class="code-function">on</span>(<span class="code-string">'submit'<
       <div class="picker-container" id="start-container"></div>
       <div class="picker-container" id="end-container"></div>
     </div>
-    <div class="example-code"><span class="code-keyword">const</span> startPicker = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>(<span class="code-string">'#start-container'</span>);
-<span class="code-keyword">const</span> endPicker = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>(<span class="code-string">'#end-container'</span>);
+    <div class="example-code"><span class="code-keyword">const</span> start = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>(<span class="code-string">'#start-container'</span>);
+<span class="code-keyword">const</span> end = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>(<span class="code-string">'#end-container'</span>);
 
-startPicker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+<span class="code-comment">// end &gt;= start, start &lt;= end. Both bounds are inclusive (same-day allowed).</span>
+EasyEpoch.<span class="code-function">linkRange</span>(start, end);
+
+start.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
   document.<span class="code-function">querySelector</span>(<span class="code-string">'#start'</span>).value = readableDate;
 });
-
-endPicker.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
+end.<span class="code-function">on</span>(<span class="code-string">'submit'</span>, (date, readableDate) => {
   document.<span class="code-function">querySelector</span>(<span class="code-string">'#end'</span>).value = readableDate;
 });</div>
+  </div>
+
+  <!-- Example: Runtime range updates -->
+  <div class="example">
+    <div class="example-header">
+      <h2>Runtime Range Updates</h2>
+      <p>Use <code>setMinDate()</code> / <code>setMaxDate()</code> to change the picker's bounds at any time. Pass <code>undefined</code> to clear a bound.</p>
+    </div>
+    <div class="example-demo">
+      <div class="demo-row">
+        <button class="demo-btn" id="runtime-open">Open Picker</button>
+        <button class="demo-btn" id="runtime-future">Future only</button>
+        <button class="demo-btn" id="runtime-past">Past only</button>
+        <button class="demo-btn" id="runtime-clear">Clear bounds</button>
+      </div>
+      <div class="demo-output" id="runtime-output">Bounds: none. Click a button to constrain, then open to see the effect...</div>
+    </div>
+    <div class="example-code"><span class="code-keyword">const</span> picker = <span class="code-keyword">new</span> <span class="code-function">EasyEpoch</span>();
+
+<span class="code-comment">// Restrict to today onward</span>
+picker.<span class="code-function">setMinDate</span>(<span class="code-keyword">new</span> <span class="code-function">Date</span>());
+
+<span class="code-comment">// Clear it</span>
+picker.<span class="code-function">setMinDate</span>(<span class="code-keyword">undefined</span>);</div>
   </div>
 
   <!-- Example 7: Event Handling -->
@@ -581,24 +755,157 @@ picker.<span class="code-function">on</span>(<span class="code-string">'close'</
     });
   })();
 
-  // Example 6: Multiple Pickers
+  // Example: Date Range (minDate / maxDate)
   (function() {
-    var startPicker = new EasyEpoch('#start-container', { zIndex: 10 });
-    var endPicker = new EasyEpoch('#end-container', { zIndex: 10 });
+    var today = new Date();
+    var in30 = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30);
+    var picker = new EasyEpoch({
+      zIndex: 10,
+      selectedDate: today,
+      minDate: today,
+      maxDate: in30,
+    });
+    var btn = document.getElementById('range-btn');
+    var output = document.getElementById('range-output');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      output.textContent = 'Selected: ' + readableDate;
+    });
+    picker.on('close', function() {
+      output.textContent = 'Past dates and dates more than 30 days out are disabled.';
+    });
+  })();
+
+  // Example: Seconds Precision (showSeconds)
+  (function() {
+    var picker = new EasyEpoch({ zIndex: 10, showSeconds: true });
+    var btn = document.getElementById('seconds-btn');
+    var output = document.getElementById('seconds-output');
+
+    btn.addEventListener('click', function() { picker.open(); });
+
+    picker.on('submit', function(date, readableDate) {
+      output.textContent = 'Selected: ' + readableDate
+        + ' (seconds = ' + date.getSeconds() + ')';
+    });
+    picker.on('close', function() {
+      output.textContent = 'Picker closed.';
+    });
+  })();
+
+  // Example: Localization (locale)
+  (function() {
+    var locales = {
+      en: undefined, // omit -> defaults to English
+      fr: {
+        months: ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'],
+        days: ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'],
+        daysShort: ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'],
+        ok: 'Valider',
+        cancel: 'Annuler',
+        selectDateTitle: 'Choisir la date',
+        selectTimeTitle: "Choisir l'heure",
+      },
+      es: {
+        months: ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
+        days: ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'],
+        daysShort: ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
+        ok: 'Aceptar',
+        cancel: 'Cancelar',
+        selectDateTitle: 'Elegir fecha',
+        selectTimeTitle: 'Elegir hora',
+      },
+      de: {
+        months: ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+        days: ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'],
+        daysShort: ['So','Mo','Di','Mi','Do','Fr','Sa'],
+        ok: 'OK',
+        cancel: 'Abbrechen',
+        selectDateTitle: 'Datum wählen',
+        selectTimeTitle: 'Uhrzeit wählen',
+      },
+    };
+
+    var lang = document.getElementById('locale-lang');
+    var btn = document.getElementById('locale-btn');
+    var output = document.getElementById('locale-output');
+    var picker = null;
+
+    function buildPicker() {
+      // Re-create on each open so changing the dropdown picks the new locale.
+      if (picker) picker.close();
+      picker = new EasyEpoch({ zIndex: 10, locale: locales[lang.value] });
+      picker.on('submit', function(date, readableDate) {
+        output.textContent = 'Selected: ' + readableDate;
+      });
+      picker.on('close', function() {
+        output.textContent = 'Language: ' + lang.options[lang.selectedIndex].text;
+      });
+    }
+
+    btn.addEventListener('click', function() {
+      buildPicker();
+      picker.open();
+    });
+  })();
+
+  // Example: Linked Date Range Pickers (linkRange)
+  (function() {
+    var start = new EasyEpoch('#start-container', { zIndex: 10 });
+    var end = new EasyEpoch('#end-container', { zIndex: 10 });
+    EasyEpoch.linkRange(start, end);
+
     var startBtn = document.getElementById('start-btn');
     var endBtn = document.getElementById('end-btn');
     var startInput = document.getElementById('start-input');
     var endInput = document.getElementById('end-input');
 
-    startBtn.addEventListener('click', function() { startPicker.open(); });
-    endBtn.addEventListener('click', function() { endPicker.open(); });
+    startBtn.addEventListener('click', function() { start.open(); });
+    endBtn.addEventListener('click', function() { end.open(); });
 
-    startPicker.on('submit', function(date, readableDate) {
+    start.on('submit', function(date, readableDate) {
       startInput.value = readableDate;
     });
-
-    endPicker.on('submit', function(date, readableDate) {
+    end.on('submit', function(date, readableDate) {
       endInput.value = readableDate;
+    });
+  })();
+
+  // Example: Runtime Range Updates (setMinDate / setMaxDate)
+  (function() {
+    var picker = new EasyEpoch({ zIndex: 10 });
+    var openBtn = document.getElementById('runtime-open');
+    var futureBtn = document.getElementById('runtime-future');
+    var pastBtn = document.getElementById('runtime-past');
+    var clearBtn = document.getElementById('runtime-clear');
+    var output = document.getElementById('runtime-output');
+
+    function describe(text) { output.textContent = text; }
+
+    openBtn.addEventListener('click', function() { picker.open(); });
+
+    futureBtn.addEventListener('click', function() {
+      picker.setMinDate(new Date());
+      picker.setMaxDate(undefined);
+      describe('Bounds: today onward (past dates disabled).');
+    });
+
+    pastBtn.addEventListener('click', function() {
+      picker.setMinDate(undefined);
+      picker.setMaxDate(new Date());
+      describe('Bounds: today and earlier (future dates disabled).');
+    });
+
+    clearBtn.addEventListener('click', function() {
+      picker.setMinDate(undefined);
+      picker.setMaxDate(undefined);
+      describe('Bounds: none. Any date is selectable.');
+    });
+
+    picker.on('submit', function(date, readableDate) {
+      describe('Selected: ' + readableDate);
     });
   })();
 
