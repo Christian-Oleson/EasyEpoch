@@ -913,6 +913,129 @@ describe('Bug fixes', () => {
     });
   });
 
+  describe('locale / i18n (issue #70)', () => {
+    const fr = {
+      months: [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+      ],
+      days: [
+        'Dimanche', 'Lundi', 'Mardi', 'Mercredi',
+        'Jeudi', 'Vendredi', 'Samedi',
+      ],
+      daysShort: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
+      ok: 'Valider',
+      cancel: 'Annuler',
+    };
+
+    it('uses English by default', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 0, 1) });
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      expect(header.textContent).toContain('January');
+      const ok = document.querySelector('.easyepoch-ok-btn')!;
+      const cancel = document.querySelector('.easyepoch-cancel-btn')!;
+      expect(ok.textContent).toBe('OK');
+      expect(cancel.textContent).toBe('Cancel');
+      const ths = document.querySelectorAll('.easyepoch-calender thead th');
+      expect(ths[0].textContent).toBe('Sun');
+    });
+
+    it('renders month names from a custom locale', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15), // June -> Juin
+        locale: fr,
+      });
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      expect(header.textContent).toContain('Juin');
+      expect(header.textContent).toContain('2024');
+    });
+
+    it('renders day-of-week header from a custom locale', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15), // a Saturday -> Samedi
+        locale: fr,
+      });
+      const dayHeader = document.querySelector('.easyepoch-day-header')!;
+      expect(dayHeader.textContent).toBe('Samedi');
+    });
+
+    it('renders calendar table headers from a custom locale', () => {
+      const picker = new EasyEpoch({ locale: fr });
+      const ths = document.querySelectorAll('.easyepoch-calender thead th');
+      expect(Array.from(ths).map(th => th.textContent)).toEqual(fr.daysShort);
+    });
+
+    it('relabels the OK and Cancel buttons', () => {
+      const picker = new EasyEpoch({ locale: fr });
+      const ok = document.querySelector('.easyepoch-ok-btn')!;
+      const cancel = document.querySelector('.easyepoch-cancel-btn')!;
+      expect(ok.textContent).toBe('Valider');
+      expect(cancel.textContent).toBe('Annuler');
+      expect(ok.getAttribute('title')).toBe('Valider');
+      expect(cancel.getAttribute('title')).toBe('Annuler');
+    });
+
+    it('honors per-string title overrides distinct from labels', () => {
+      const picker = new EasyEpoch({
+        locale: { ok: 'Go', okTitle: 'Confirm selection' },
+      });
+      const ok = document.querySelector('.easyepoch-ok-btn')!;
+      expect(ok.textContent).toBe('Go');
+      expect(ok.getAttribute('title')).toBe('Confirm selection');
+    });
+
+    it('parses the localized header back into selectedDate after navigation', () => {
+      // Regression: updateSelectedDate must understand the localized month name.
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 0, 15),
+        locale: fr,
+      });
+      // Click next to navigate Janvier -> Février
+      (document.querySelector('.easyepoch-icon-next') as HTMLElement).click();
+      // Header should now read "Février 2024"
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      expect(header.textContent).toContain('Février');
+      // selectedDate.getMonth() should be 1 (February), not -1 or 0
+      expect(picker.selectedDate.getMonth()).toBe(1);
+    });
+
+    it('preserves locale when picking a new date in the same month', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 1),
+        locale: fr,
+      });
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      const day20 = Array.from(tds).find(td => td.textContent!.trim() === '20') as HTMLElement;
+      day20.click();
+      expect(picker.selectedDate.getDate()).toBe(20);
+      expect(picker.selectedDate.getMonth()).toBe(5);
+    });
+
+    it('falls back to defaults for unspecified locale fields', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 0, 1),
+        locale: { ok: 'Go' }, // months/days/cancel/etc unspecified
+      });
+      // Defaults still apply where not overridden.
+      const cancel = document.querySelector('.easyepoch-cancel-btn')!;
+      expect(cancel.textContent).toBe('Cancel');
+      const header = document.querySelector('.easyepoch-month-and-year')!;
+      expect(header.textContent).toContain('January');
+    });
+
+    it('keyboard navigation works under a custom locale (issue #70 + #1)', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15),
+        locale: fr,
+      });
+      picker.open();
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'ArrowRight', bubbles: true, cancelable: true,
+      }));
+      expect(picker.selectedDate.getDate()).toBe(16);
+    });
+  });
+
   describe('keyboard navigation (issue #1)', () => {
     function key(name: string, opts: { shiftKey?: boolean } = {}) {
       document.dispatchEvent(new KeyboardEvent('keydown', {

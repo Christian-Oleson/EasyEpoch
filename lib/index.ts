@@ -5,6 +5,43 @@ import { htmlTemplate } from './template';
 type EasyEpochEvent = 'submit' | 'close';
 type EasyEpochTheme = 'light' | 'dark' | Record<string, string>;
 
+interface EasyEpochLocale {
+  // 12 month names, January..December
+  months?: string[];
+  // 7 full day names, Sunday..Saturday (used in the day-of-week header)
+  days?: string[];
+  // 7 short day names, Sun..Sat (used as calendar table column headers)
+  daysShort?: string[];
+  // Button labels
+  ok?: string;
+  cancel?: string;
+  // Tooltip titles for the icon/action buttons
+  selectDateTitle?: string;
+  selectTimeTitle?: string;
+  okTitle?: string;
+  cancelTitle?: string;
+}
+
+type ResolvedLocale = Required<EasyEpochLocale>;
+
+const defaultLocale: ResolvedLocale = {
+  months: [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ],
+  days: [
+    'Sunday', 'Monday', 'Tuesday', 'Wednesday',
+    'Thursday', 'Friday', 'Saturday',
+  ],
+  daysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  ok: 'OK',
+  cancel: 'Cancel',
+  selectDateTitle: 'Select date from calender!',
+  selectTimeTitle: 'Select time',
+  okTitle: 'OK',
+  cancelTitle: 'Cancel',
+};
+
 interface EasyEpochOpts {
   zIndex?: number;
   compactMode?: boolean;
@@ -14,6 +51,7 @@ interface EasyEpochOpts {
   minDate?: Date;
   maxDate?: Date;
   showSeconds?: boolean;
+  locale?: EasyEpochLocale;
 }
 
 const validListeners = [
@@ -59,6 +97,7 @@ class EasyEpoch {
   private showSeconds: boolean;
   private minDate?: Date;
   private maxDate?: Date;
+  private locale: ResolvedLocale;
 
   constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts) {
     let el: HTMLElement | undefined = undefined;
@@ -133,8 +172,6 @@ class EasyEpoch {
     this.$activeCell = null;
 
     this.$time.classList.add('easyepoch-fade');
-    const now = new Date();
-    this.render(dateUtil.scrapeMonth(now, this.monthTracker));
 
     opts = opts || {};
     this.opts = opts;
@@ -143,11 +180,18 @@ class EasyEpoch {
     this.showSeconds = opts.showSeconds === true;
     this.minDate = opts.minDate ? this.startOfDay(opts.minDate) : undefined;
     this.maxDate = opts.maxDate ? this.startOfDay(opts.maxDate) : undefined;
+    // Locale must be set before the first render so updateDateComponents can
+    // read this.locale.months / this.locale.days when laying out the header.
+    this.locale = this.resolveLocale(opts.locale);
+    this.applyLocaleStrings();
 
     if (this.showSeconds) {
       this.$timeInput.setAttribute('step', '1');
       this.$timeInput.value = '12:00:00';
     }
+
+    const now = new Date();
+    this.render(dateUtil.scrapeMonth(now, this.monthTracker));
 
     this.reset(opts.selectedDate || now);
 
@@ -168,6 +212,42 @@ class EasyEpoch {
 
   private startOfDay(d: Date): Date {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  private resolveLocale(input?: EasyEpochLocale): ResolvedLocale {
+    const merged: ResolvedLocale = { ...defaultLocale, ...(input || {}) };
+    // If a label is overridden but its tooltip is not, mirror the label so the
+    // tooltip stays in the user's language rather than reverting to English.
+    if (input && input.ok !== undefined && input.okTitle === undefined) {
+      merged.okTitle = input.ok;
+    }
+    if (input && input.cancel !== undefined && input.cancelTitle === undefined) {
+      merged.cancelTitle = input.cancel;
+    }
+    return merged;
+  }
+
+  private applyLocaleStrings() {
+    const { locale } = this;
+    // Calendar table column headers: 7 <th> in the <thead>.
+    const ths = this.$$('.easyepoch-calender thead th');
+    if (locale.daysShort.length === 7) {
+      for (let i = 0; i < 7 && i < ths.length; i++) {
+        ths[i].textContent = locale.daysShort[i];
+      }
+    }
+
+    // OK / Cancel button labels and tooltips.
+    this.$ok.textContent = locale.ok;
+    this.$ok.setAttribute('title', locale.okTitle);
+    this.$cancel.textContent = locale.cancel;
+    this.$cancel.setAttribute('title', locale.cancelTitle);
+
+    // Calendar/time toggle button tooltips.
+    const calenderIcon = this.$('.easyepoch-icon-calender');
+    if (calenderIcon) calenderIcon.setAttribute('title', locale.selectDateTitle);
+    const timeIcon = this.$('.easyepoch-icon-time');
+    if (timeIcon) timeIcon.setAttribute('title', locale.selectTimeTitle);
   }
 
   private isDateOutOfRange(year: number, month: number, day: number): boolean {
@@ -298,8 +378,8 @@ class EasyEpoch {
   }
 
   updateDateComponents(date: Date) {
-    const day = dateUtil.days[date.getDay()];
-    const month = dateUtil.months[date.getMonth()];
+    const day = this.locale.days[date.getDay()];
+    const month = this.locale.months[date.getMonth()];
     const year = date.getFullYear();
     const monthAndYear = month + ' ' + year;
 
@@ -361,10 +441,12 @@ class EasyEpoch {
     }
 
     const monthAndYearText = ($monthAndYear.textContent || '').trim();
-    const parts = monthAndYearText.split(' ');
-    const monthName = parts[0] || '';
-    const year = parts[1] || '0';
-    const month = dateUtil.months.indexOf(monthName);
+    // The header text is "<localized month> <year>". We rsplit on the last
+    // space so multi-word month names (very rare, but cheap to support) survive.
+    const lastSpace = monthAndYearText.lastIndexOf(' ');
+    const monthName = lastSpace >= 0 ? monthAndYearText.slice(0, lastSpace) : monthAndYearText;
+    const year = lastSpace >= 0 ? monthAndYearText.slice(lastSpace + 1) : '0';
+    const month = this.locale.months.indexOf(monthName);
 
     let hours = 0;
     let minutes = 0;

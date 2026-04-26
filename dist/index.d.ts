@@ -1,5 +1,16 @@
 type EasyEpochEvent = 'submit' | 'close';
 type EasyEpochTheme = 'light' | 'dark' | Record<string, string>;
+interface EasyEpochLocale {
+    months?: string[];
+    days?: string[];
+    daysShort?: string[];
+    ok?: string;
+    cancel?: string;
+    selectDateTitle?: string;
+    selectTimeTitle?: string;
+    okTitle?: string;
+    cancelTitle?: string;
+}
 interface EasyEpochOpts {
     zIndex?: number;
     compactMode?: boolean;
@@ -9,6 +20,7 @@ interface EasyEpochOpts {
     minDate?: Date;
     maxDate?: Date;
     showSeconds?: boolean;
+    locale?: EasyEpochLocale;
 }
 type HandlerFunction = (...args: unknown[]) => void;
 interface EventHandlers {
@@ -46,10 +58,13 @@ declare class EasyEpoch {
     private showSeconds;
     private minDate?;
     private maxDate?;
+    private locale;
     constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts);
     initElMethod(el: HTMLElement): void;
     init(wrapper: HTMLElement, opts: EasyEpochOpts): void;
     private startOfDay;
+    private resolveLocale;
+    private applyLocaleStrings;
     private isDateOutOfRange;
     reset(newDate?: Date): void;
     compactMode(): void;
