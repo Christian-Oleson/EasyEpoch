@@ -70,6 +70,12 @@ declare class EasyEpoch {
     compactMode(): void;
     disableTimeSection(): void;
     enableTimeSection(): void;
+    setMinDate(date?: Date): void;
+    setMaxDate(date?: Date): void;
+    private refreshCalendar;
+    linkAfter(other: EasyEpoch): this;
+    linkBefore(other: EasyEpoch): this;
+    static linkRange(start: EasyEpoch, end: EasyEpoch): void;
     private static readonly CSS_VAR_NAME_RE;
     private static readonly UNSAFE_CSS_VALUE_RE;
     private static readonly BANNED_KEYS;

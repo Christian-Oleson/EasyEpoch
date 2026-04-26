@@ -333,6 +333,65 @@ class EasyEpoch {
     this.updateSelectedDate();
   }
 
+  // Runtime setters for the date range. Pass `undefined` to clear the bound.
+  // Re-renders the currently displayed month so cells immediately reflect the
+  // new constraint. The previously-selected cell stays selected if it's still
+  // in range and on the visible month.
+  setMinDate(date?: Date): void {
+    this.minDate = date ? this.startOfDay(date) : undefined;
+    this.refreshCalendar();
+  }
+
+  setMaxDate(date?: Date): void {
+    this.maxDate = date ? this.startOfDay(date) : undefined;
+    this.refreshCalendar();
+  }
+
+  private refreshCalendar(): void {
+    const cur = this.monthTracker.current;
+    if (!cur) return;
+    this.render(dateUtil.scrapeMonth(cur, this.monthTracker));
+    // render() clears the active class on every cell; re-apply it for the
+    // current selection if that day is on the visible month and not disabled.
+    const sel = this.selectedDate;
+    if (sel.getFullYear() === cur.getFullYear() && sel.getMonth() === cur.getMonth()) {
+      const $td = this.findElementWithDate(sel.getDate().toString());
+      if ($td && $td.dataset.disabled === undefined) {
+        $td.classList.add('active');
+        this.$activeCell = $td;
+      } else {
+        this.$activeCell = null;
+      }
+    } else {
+      this.$activeCell = null;
+    }
+  }
+
+  // Wire two pickers together so this picker's lower bound tracks `other`'s
+  // selection. Each time `other` submits, this picker's minDate is updated to
+  // the date the user just confirmed and the calendar is re-rendered. The
+  // current `other.selectedDate` is applied immediately so links work even
+  // when the source picker has already been used.
+  linkAfter(other: EasyEpoch): this {
+    other.on('submit', () => this.setMinDate(other.selectedDate));
+    if (other.selectedDate) this.setMinDate(other.selectedDate);
+    return this;
+  }
+
+  // Mirror of linkAfter: this picker's upper bound tracks `other`'s selection.
+  linkBefore(other: EasyEpoch): this {
+    other.on('submit', () => this.setMaxDate(other.selectedDate));
+    if (other.selectedDate) this.setMaxDate(other.selectedDate);
+    return this;
+  }
+
+  // Sugar for the from/to pattern: starts at most == ends, ends at least == starts.
+  // Both ends inclusive (same-day ranges are allowed).
+  static linkRange(start: EasyEpoch, end: EasyEpoch): void {
+    end.linkAfter(start);
+    start.linkBefore(end);
+  }
+
   // Allowed CSS custom property name pattern: only alphanumeric, hyphens, and underscores.
   private static readonly CSS_VAR_NAME_RE = /^--[a-zA-Z0-9_-]+$/;
   // Block CSS values that could exfiltrate data via url()/image()/image-set() or
