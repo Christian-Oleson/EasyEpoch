@@ -913,6 +913,180 @@ describe('Bug fixes', () => {
     });
   });
 
+  describe('accessibility', () => {
+    function key(name: string, opts: { shiftKey?: boolean } = {}) {
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: name, bubbles: true, cancelable: true, ...opts,
+      }));
+    }
+
+    it('wrapper has role=dialog and aria-modal', () => {
+      const picker = new EasyEpoch();
+      const wrapper = document.querySelector('.easyepoch-wrapper')!;
+      expect(wrapper.getAttribute('role')).toBe('dialog');
+      expect(wrapper.getAttribute('aria-modal')).toBe('true');
+      expect(wrapper.getAttribute('aria-label')).toBe('Date picker');
+    });
+
+    it('dialog label is localized', () => {
+      const picker = new EasyEpoch({ locale: { dialogLabel: 'Sélecteur de date' } });
+      const wrapper = document.querySelector('.easyepoch-wrapper')!;
+      expect(wrapper.getAttribute('aria-label')).toBe('Sélecteur de date');
+    });
+
+    it('calendar table has role=grid', () => {
+      const picker = new EasyEpoch();
+      const table = document.querySelector('.easyepoch-calender table')!;
+      expect(table.getAttribute('role')).toBe('grid');
+    });
+
+    it('day-of-week headers carry scope=col', () => {
+      const picker = new EasyEpoch();
+      const ths = document.querySelectorAll('.easyepoch-calender thead th');
+      ths.forEach(th => expect(th.getAttribute('scope')).toBe('col'));
+    });
+
+    it('calendar cells have role=gridcell', () => {
+      const picker = new EasyEpoch();
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      expect(tds.length).toBe(42);
+      tds.forEach(td => expect(td.getAttribute('role')).toBe('gridcell'));
+    });
+
+    it('the active cell has aria-selected=true; others do not', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      const activeCount = Array.from(tds).filter(
+        td => td.getAttribute('aria-selected') === 'true'
+      ).length;
+      expect(activeCount).toBe(1);
+      const active = document.querySelector('.easyepoch-calender tbody td.active')!;
+      expect(active.getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('out-of-range cells get aria-disabled=true', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15),
+        minDate: new Date(2024, 5, 10),
+      });
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      const day5 = Array.from(tds).find(td => td.textContent!.trim() === '5')!;
+      const day15 = Array.from(tds).find(td => td.textContent!.trim() === '15')!;
+      expect(day5.getAttribute('aria-disabled')).toBe('true');
+      expect(day15.hasAttribute('aria-disabled')).toBe(false);
+    });
+
+    it('uses roving tabindex on the calendar grid', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      const tabbable = Array.from(tds).filter(td => td.getAttribute('tabindex') === '0');
+      expect(tabbable.length).toBe(1);
+      expect(tabbable[0].textContent!.trim()).toBe('15');
+      const nonTabbable = Array.from(tds).filter(td => td.getAttribute('tabindex') === '-1');
+      expect(nonTabbable.length).toBe(41);
+    });
+
+    it('moves focus to the active cell on open', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      const elsewhere = document.createElement('button');
+      document.body.appendChild(elsewhere);
+      elsewhere.focus();
+      expect(document.activeElement).toBe(elsewhere);
+
+      picker.open();
+      const active = document.querySelector('.easyepoch-calender tbody td.active');
+      expect(document.activeElement).toBe(active);
+    });
+
+    it('restores focus to the previously-focused element on close', () => {
+      const trigger = document.createElement('button');
+      trigger.id = 'trigger-btn';
+      document.body.appendChild(trigger);
+      trigger.focus();
+      expect(document.activeElement).toBe(trigger);
+
+      const picker = new EasyEpoch();
+      picker.open();
+      expect(document.activeElement).not.toBe(trigger);
+      picker.close();
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it('focus follows the active cell during keyboard nav', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      picker.open();
+      key('ArrowRight'); // -> June 16
+      const active = document.querySelector('.easyepoch-calender tbody td.active')!;
+      expect(active.textContent!.trim()).toBe('16');
+      expect(document.activeElement).toBe(active);
+    });
+
+    it('Tab is trapped at the last focusable element', () => {
+      const picker = new EasyEpoch();
+      picker.open();
+      const wrapper = document.querySelector('.easyepoch-wrapper')!;
+      const ok = wrapper.querySelector('.easyepoch-ok-btn') as HTMLElement;
+      ok.focus();
+      key('Tab');
+      expect(wrapper.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).not.toBe(ok);
+    });
+
+    it('Shift+Tab is trapped at the first focusable element', () => {
+      const picker = new EasyEpoch();
+      picker.open();
+      const wrapper = document.querySelector('.easyepoch-wrapper')!;
+      const focusables = wrapper.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), [tabindex="0"]'
+      );
+      const first = focusables[0] as HTMLElement;
+      first.focus();
+      key('Tab', { shiftKey: true });
+      expect(wrapper.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).not.toBe(first);
+    });
+
+    it('icon buttons have aria-label set from the locale', () => {
+      const picker = new EasyEpoch();
+      const cal = document.querySelector('.easyepoch-icon-calender')!;
+      const tm = document.querySelector('.easyepoch-icon-time')!;
+      const prev = document.querySelector('.easyepoch-icon-previous')!;
+      const next = document.querySelector('.easyepoch-icon-next')!;
+      expect(cal.getAttribute('aria-label')).toBe('Select date from calendar!');
+      expect(tm.getAttribute('aria-label')).toBe('Select time');
+      expect(prev.getAttribute('aria-label')).toBe('Previous month');
+      expect(next.getAttribute('aria-label')).toBe('Next month');
+    });
+
+    it('icon button aria-labels respect a custom locale', () => {
+      const picker = new EasyEpoch({
+        locale: {
+          previousMonthTitle: 'Mois précédent',
+          nextMonthTitle: 'Mois suivant',
+        },
+      });
+      const prev = document.querySelector('.easyepoch-icon-previous')!;
+      const next = document.querySelector('.easyepoch-icon-next')!;
+      expect(prev.getAttribute('aria-label')).toBe('Mois précédent');
+      expect(next.getAttribute('aria-label')).toBe('Mois suivant');
+    });
+
+    it('SVG icons are aria-hidden so screen readers ignore them', () => {
+      const picker = new EasyEpoch();
+      const svgs = document.querySelectorAll('.easyepoch-icon svg');
+      expect(svgs.length).toBeGreaterThan(0);
+      svgs.forEach(svg => expect(svg.getAttribute('aria-hidden')).toBe('true'));
+    });
+
+    it('does not steal focus during construction (picker not yet open)', () => {
+      const trigger = document.createElement('button');
+      document.body.appendChild(trigger);
+      trigger.focus();
+      const picker = new EasyEpoch();
+      expect(document.activeElement).toBe(trigger);
+    });
+  });
+
   describe('runtime setMinDate / setMaxDate', () => {
     it('updates min/max bounds and re-marks cells immediately', () => {
       const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });

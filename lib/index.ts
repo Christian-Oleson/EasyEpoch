@@ -15,11 +15,17 @@ interface EasyEpochLocale {
   // Button labels
   ok?: string;
   cancel?: string;
-  // Tooltip titles for the icon/action buttons
+  // Tooltip titles for the icon/action buttons (mouse-hover and the default
+  // accessible name when no separate aria-label is given).
   selectDateTitle?: string;
   selectTimeTitle?: string;
   okTitle?: string;
   cancelTitle?: string;
+  previousMonthTitle?: string;
+  nextMonthTitle?: string;
+  // Accessible name for the dialog as a whole, announced to screen readers
+  // when the picker opens.
+  dialogLabel?: string;
 }
 
 type ResolvedLocale = Required<EasyEpochLocale>;
@@ -40,6 +46,9 @@ const defaultLocale: ResolvedLocale = {
   selectTimeTitle: 'Select time',
   okTitle: 'OK',
   cancelTitle: 'Cancel',
+  previousMonthTitle: 'Previous month',
+  nextMonthTitle: 'Next month',
+  dialogLabel: 'Date picker',
 };
 
 interface EasyEpochOpts {
@@ -98,6 +107,7 @@ class EasyEpoch {
   private minDate?: Date;
   private maxDate?: Date;
   private locale: ResolvedLocale;
+  private previouslyFocused: HTMLElement | null = null;
 
   constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts) {
     let el: HTMLElement | undefined = undefined;
@@ -244,11 +254,15 @@ class EasyEpoch {
     const cancelTitle = validStr(i.cancelTitle) ?? (validStr(i.cancel) !== undefined ? cancel : defaultLocale.cancelTitle);
     const selectDateTitle = validStr(i.selectDateTitle) ?? defaultLocale.selectDateTitle;
     const selectTimeTitle = validStr(i.selectTimeTitle) ?? defaultLocale.selectTimeTitle;
+    const previousMonthTitle = validStr(i.previousMonthTitle) ?? defaultLocale.previousMonthTitle;
+    const nextMonthTitle = validStr(i.nextMonthTitle) ?? defaultLocale.nextMonthTitle;
+    const dialogLabel = validStr(i.dialogLabel) ?? defaultLocale.dialogLabel;
 
     return {
       months, days, daysShort,
       ok, cancel,
       selectDateTitle, selectTimeTitle, okTitle, cancelTitle,
+      previousMonthTitle, nextMonthTitle, dialogLabel,
     };
   }
 
@@ -268,11 +282,22 @@ class EasyEpoch {
     this.$cancel.textContent = locale.cancel;
     this.$cancel.setAttribute('title', locale.cancelTitle);
 
-    // Calendar/time toggle button tooltips.
-    const calenderIcon = this.$('.easyepoch-icon-calender');
-    if (calenderIcon) calenderIcon.setAttribute('title', locale.selectDateTitle);
-    const timeIcon = this.$('.easyepoch-icon-time');
-    if (timeIcon) timeIcon.setAttribute('title', locale.selectTimeTitle);
+    // Set both `title` (mouse hover) and `aria-label` (assistive tech) on every
+    // icon button. Screen readers announce the aria-label; sighted users hover
+    // for the title. Both use the same string for now.
+    const setIconLabels = (sel: string, label: string) => {
+      const el = this.$(sel);
+      if (!el) return;
+      el.setAttribute('title', label);
+      el.setAttribute('aria-label', label);
+    };
+    setIconLabels('.easyepoch-icon-calender', locale.selectDateTitle);
+    setIconLabels('.easyepoch-icon-time', locale.selectTimeTitle);
+    setIconLabels('.easyepoch-icon-previous', locale.previousMonthTitle);
+    setIconLabels('.easyepoch-icon-next', locale.nextMonthTitle);
+
+    // Dialog accessible name.
+    this.$easyepochWrapper.setAttribute('aria-label', locale.dialogLabel);
   }
 
   private isDateOutOfRange(year: number, month: number, day: number): boolean {
@@ -458,6 +483,9 @@ class EasyEpoch {
     this.$tds.forEach((td) => {
       td.textContent = '';
       td.classList.remove('active');
+      td.removeAttribute('aria-selected');
+      td.removeAttribute('aria-disabled');
+      td.setAttribute('tabindex', '-1');
     });
   }
 
@@ -487,6 +515,8 @@ class EasyEpoch {
         td.removeAttribute('data-disabled');
         if (!day) {
           td.setAttribute('data-empty', '');
+          // Empty cells are still gridcells; mark them disabled+hidden to AT.
+          td.setAttribute('aria-disabled', 'true');
           return;
         }
 
@@ -495,6 +525,7 @@ class EasyEpoch {
 
         if (this.isDateOutOfRange(renderedYear, renderedMonth, day as number)) {
           td.setAttribute('data-disabled', '');
+          td.setAttribute('aria-disabled', 'true');
         }
       });
     });
@@ -573,12 +604,26 @@ class EasyEpoch {
   selectDateElement(el: HTMLElement) {
     if (this.$activeCell) {
       this.$activeCell.classList.remove('active');
+      this.$activeCell.removeAttribute('aria-selected');
+      this.$activeCell.setAttribute('tabindex', '-1');
     }
     el.classList.add('active');
+    el.setAttribute('aria-selected', 'true');
+    // Roving tabindex: only the active cell is in the tab sequence; arrow keys
+    // move it from there. This is the standard ARIA grid pattern.
+    el.setAttribute('tabindex', '0');
     this.$activeCell = el;
 
     this.updateSelectedDate(el);
     this.updateDateComponents(this.selectedDate);
+
+    // When the picker is open, follow the active cell with focus so keyboard
+    // nav lands on the new cell (and screen readers announce it). Skipped when
+    // closed so init/reset doesn't steal focus from the page.
+    if (this.$easyepochWrapper.classList.contains('active') &&
+        typeof el.focus === 'function') {
+      el.focus();
+    }
   }
 
   findElementWithDate(date: string, returnLastIfNotFound: boolean = false) {
@@ -716,6 +761,13 @@ class EasyEpoch {
     // a keystroke only routes to the visible picker.
     if (!this.$easyepochWrapper.classList.contains('active')) return;
 
+    // Tab is trapped so the modal can't be tabbed out of. We handle this BEFORE
+    // the time-input bailout so the trap applies even with the input focused.
+    if (e.key === 'Tab') {
+      this.trapTab(e);
+      return;
+    }
+
     // Don't hijack arrows / Enter while the user is editing the time input.
     const target = e.target as HTMLElement | null;
     if (target && target.tagName === 'INPUT') return;
@@ -763,6 +815,51 @@ class EasyEpoch {
         return;
     }
   };
+
+  // Focus trap for Tab / Shift+Tab. We let the browser advance focus through
+  // the dialog's own focusables normally; we only intercept at the boundaries
+  // so focus loops back into the modal instead of escaping to the page.
+  private trapTab(e: KeyboardEvent) {
+    const focusables = this.getFocusableElements();
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+
+    if (e.shiftKey && (active === first || !this.$easyepochWrapper.contains(active))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (active === last || !this.$easyepochWrapper.contains(active))) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Returns visible, enabled focusable elements inside the dialog, in DOM order.
+  // The active calendar cell participates via roving tabindex (tabindex="0");
+  // the rest of the cells are tabindex="-1" and are excluded here.
+  private getFocusableElements(): HTMLElement[] {
+    const sel = [
+      'button:not([disabled])',
+      'input:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const all = Array.from(this.$$(sel)) as HTMLElement[];
+    return all.filter((el) => !this.isInHiddenPane(el));
+  }
+
+  // Walk up to the wrapper and return true if any ancestor has inline
+  // display:none. The picker's pane toggling sets inline display so this is a
+  // reliable signal in both real browsers and JSDOM (where computed layout is
+  // not available, ruling out offsetParent / getComputedStyle approaches).
+  private isInHiddenPane(el: HTMLElement): boolean {
+    let cur: HTMLElement | null = el;
+    while (cur && cur !== this.$easyepochWrapper) {
+      if (cur.style && cur.style.display === 'none') return true;
+      cur = cur.parentElement;
+    }
+    return false;
+  }
 
   private shiftSelectedDateBy(days: number, months: number = 0) {
     const d = this.selectedDate;
@@ -824,12 +921,38 @@ class EasyEpoch {
   }
 
   open() {
+    // Remember what had focus so we can restore it after close. This keeps
+    // keyboard / screen-reader users where they were before the modal stole
+    // focus. Skip if the active element is the body (no meaningful focus).
+    const active = document.activeElement;
+    this.previouslyFocused =
+      active && active !== document.body && active instanceof HTMLElement
+        ? active
+        : null;
+
     this.$easyepochWrapper.classList.add('active');
+
+    // Move focus into the dialog. The active calendar cell is the most useful
+    // landing spot for keyboard users; if there isn't one (e.g., date is
+    // out-of-range and was cleared) fall back to the OK button.
+    const target = this.$activeCell || this.$ok;
+    if (target && typeof target.focus === 'function') {
+      target.focus();
+    }
   }
 
   // can be called by user or by click the cancel btn.
   close() {
     this.$easyepochWrapper.classList.remove('active');
+
+    // Restore focus to whatever had it before open(). Wrapped in a guard so a
+    // stale reference (the element was removed from the DOM in the interim)
+    // doesn't throw.
+    const restore = this.previouslyFocused;
+    this.previouslyFocused = null;
+    if (restore && document.contains(restore) && typeof restore.focus === 'function') {
+      restore.focus();
+    }
   }
 
   on(event: EasyEpochEvent, handler: HandlerFunction) {

@@ -10,6 +10,9 @@ interface EasyEpochLocale {
     selectTimeTitle?: string;
     okTitle?: string;
     cancelTitle?: string;
+    previousMonthTitle?: string;
+    nextMonthTitle?: string;
+    dialogLabel?: string;
 }
 interface EasyEpochOpts {
     zIndex?: number;
@@ -59,6 +62,7 @@ declare class EasyEpoch {
     private minDate?;
     private maxDate?;
     private locale;
+    private previouslyFocused;
     constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts);
     initElMethod(el: HTMLElement): void;
     init(wrapper: HTMLElement, opts: EasyEpochOpts): void;
@@ -95,6 +99,9 @@ declare class EasyEpoch {
     private submit;
     private cancelClose;
     private handleKeydown;
+    private trapTab;
+    private getFocusableElements;
+    private isInHiddenPane;
     private shiftSelectedDateBy;
     private moveSelectionToDayOfMonth;
     private moveSelectionTo;
