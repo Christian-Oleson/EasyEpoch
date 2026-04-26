@@ -913,6 +913,194 @@ describe('Bug fixes', () => {
     });
   });
 
+  describe('runtime setMinDate / setMaxDate', () => {
+    it('updates min/max bounds and re-marks cells immediately', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      // No bounds yet — June 5 is fine.
+      let day5 = Array.from(document.querySelectorAll('.easyepoch-calender tbody td'))
+        .find(td => td.textContent!.trim() === '5')!;
+      expect(day5.hasAttribute('data-disabled')).toBe(false);
+
+      picker.setMinDate(new Date(2024, 5, 10));
+      day5 = Array.from(document.querySelectorAll('.easyepoch-calender tbody td'))
+        .find(td => td.textContent!.trim() === '5')!;
+      expect(day5.hasAttribute('data-disabled')).toBe(true);
+    });
+
+    it('clears bounds when called with undefined', () => {
+      const picker = new EasyEpoch({
+        selectedDate: new Date(2024, 5, 15),
+        minDate: new Date(2024, 5, 10),
+      });
+      picker.setMinDate(undefined);
+      const day5 = Array.from(document.querySelectorAll('.easyepoch-calender tbody td'))
+        .find(td => td.textContent!.trim() === '5')!;
+      expect(day5.hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('preserves the active selection when still in range after re-render', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 20) });
+      picker.setMinDate(new Date(2024, 5, 10));
+      const active = document.querySelector('.easyepoch-calender tbody td.active');
+      expect(active!.textContent!.trim()).toBe('20');
+    });
+
+    it('drops the active class when the previously-selected day becomes disabled', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 5) });
+      picker.setMinDate(new Date(2024, 5, 10)); // June 5 is now disabled
+      const active = document.querySelector('.easyepoch-calender tbody td.active');
+      expect(active).toBeNull();
+    });
+  });
+
+  describe('linked pickers (issue #51)', () => {
+    function findCell(root: ParentNode, day: string): HTMLElement {
+      return Array.from(root.querySelectorAll('.easyepoch-calender tbody td'))
+        .find(td => td.textContent!.trim() === day) as HTMLElement;
+    }
+
+    it('linkAfter: end picker minDate tracks start picker submit', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      const start = new EasyEpoch(div1, { selectedDate: new Date(2024, 5, 1) });
+      const end = new EasyEpoch(div2, { selectedDate: new Date(2024, 5, 1) });
+      end.linkAfter(start);
+
+      // Move start to June 15 and submit.
+      findCell(div1, '15').click();
+      (div1.querySelector('.easyepoch-ok-btn') as HTMLElement).click();
+
+      // End picker's June 10 should now be disabled, June 15 should not.
+      expect(findCell(div2, '10').hasAttribute('data-disabled')).toBe(true);
+      expect(findCell(div2, '15').hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('linkAfter: applies the source\'s current selection immediately on link', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      // Source already has a date set before linking.
+      const start = new EasyEpoch(div1, { selectedDate: new Date(2024, 5, 20) });
+      const end = new EasyEpoch(div2, { selectedDate: new Date(2024, 5, 25) });
+      end.linkAfter(start);
+
+      // Link should propagate immediately, not wait for next submit.
+      expect(findCell(div2, '15').hasAttribute('data-disabled')).toBe(true);
+      expect(findCell(div2, '20').hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('linkBefore: start picker maxDate tracks end picker submit', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      const start = new EasyEpoch(div1, { selectedDate: new Date(2024, 5, 30) });
+      const end = new EasyEpoch(div2, { selectedDate: new Date(2024, 5, 30) });
+      start.linkBefore(end);
+
+      findCell(div2, '15').click();
+      (div2.querySelector('.easyepoch-ok-btn') as HTMLElement).click();
+
+      // Start picker's June 20 should now be disabled.
+      expect(findCell(div1, '20').hasAttribute('data-disabled')).toBe(true);
+      expect(findCell(div1, '15').hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('EasyEpoch.linkRange wires both directions in one call', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      const start = new EasyEpoch(div1, { selectedDate: new Date(2024, 5, 10) });
+      const end = new EasyEpoch(div2, { selectedDate: new Date(2024, 5, 20) });
+      EasyEpoch.linkRange(start, end);
+
+      // Both bounds applied immediately.
+      expect(findCell(div1, '25').hasAttribute('data-disabled')).toBe(true);  // > end
+      expect(findCell(div2, '5').hasAttribute('data-disabled')).toBe(true);   // < start
+
+      // Move start forward; end's lower bound should follow on submit.
+      findCell(div1, '15').click();
+      (div1.querySelector('.easyepoch-ok-btn') as HTMLElement).click();
+      expect(findCell(div2, '12').hasAttribute('data-disabled')).toBe(true);
+      expect(findCell(div2, '15').hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('inclusive bounds: same-day selection is allowed', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      const start = new EasyEpoch(div1, { selectedDate: new Date(2024, 5, 15) });
+      const end = new EasyEpoch(div2, { selectedDate: new Date(2024, 5, 15) });
+      end.linkAfter(start);
+
+      // June 15 in `end` should NOT be disabled — same day is permitted.
+      expect(findCell(div2, '15').hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('linked picker keeps its selection when still in the new range', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      const start = new EasyEpoch(div1, { selectedDate: new Date(2024, 5, 1) });
+      const end = new EasyEpoch(div2, { selectedDate: new Date(2024, 5, 25) });
+      end.linkAfter(start);
+
+      findCell(div1, '10').click();
+      (div1.querySelector('.easyepoch-ok-btn') as HTMLElement).click();
+
+      // End's selection (June 25) is still valid (>= June 10), so it stays active.
+      const active = div2.querySelector('.easyepoch-calender tbody td.active');
+      expect(active).not.toBeNull();
+      expect(active!.textContent!.trim()).toBe('25');
+      expect(end.selectedDate.getDate()).toBe(25);
+    });
+
+    it('does not affect unrelated pickers (multi-instance isolation)', () => {
+      const a = document.createElement('div');
+      const b = document.createElement('div');
+      const c = document.createElement('div');
+      document.body.appendChild(a);
+      document.body.appendChild(b);
+      document.body.appendChild(c);
+
+      const pa = new EasyEpoch(a, { selectedDate: new Date(2024, 5, 1) });
+      const pb = new EasyEpoch(b, { selectedDate: new Date(2024, 5, 1) });
+      const pc = new EasyEpoch(c, { selectedDate: new Date(2024, 5, 1) });
+      pb.linkAfter(pa);
+
+      findCell(a, '20').click();
+      (a.querySelector('.easyepoch-ok-btn') as HTMLElement).click();
+
+      // pc was never linked, so its cells should not be disabled.
+      expect(findCell(c, '5').hasAttribute('data-disabled')).toBe(false);
+      expect(findCell(c, '15').hasAttribute('data-disabled')).toBe(false);
+    });
+
+    it('returns the linked instance for chaining', () => {
+      const div1 = document.createElement('div');
+      const div2 = document.createElement('div');
+      document.body.appendChild(div1);
+      document.body.appendChild(div2);
+
+      const a = new EasyEpoch(div1);
+      const b = new EasyEpoch(div2);
+      expect(b.linkAfter(a)).toBe(b);
+      expect(a.linkBefore(b)).toBe(a);
+    });
+  });
+
   describe('locale / i18n (issue #70)', () => {
     const fr = {
       months: [

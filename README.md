@@ -159,6 +159,42 @@ picker.setTheme('dark');
 picker.setTheme({ bg: '#0a0a0a', primary: '#ff6b6b', text: '#f0f0f0' });
 ```
 
+### `picker.setMinDate(date?)` / `picker.setMaxDate(date?)`
+
+- `date` (optional, `Date`) - New lower / upper bound. Pass `undefined` (or no argument) to clear the bound.
+
+Updates the picker's selectable range and re-renders the visible month so out-of-range cells become non-clickable immediately. The active selection is preserved if it's still on the visible month and in range; otherwise the active highlight is cleared (the `selectedDate` property itself is left alone).
+
+### `picker.linkAfter(other)` / `picker.linkBefore(other)`
+
+- `other` (required, `EasyEpoch`) - The picker whose selection drives this picker's bound.
+
+`linkAfter` makes this picker's `minDate` track `other.selectedDate`: every time `other` submits, this picker's lower bound advances to the date the user just confirmed. `linkBefore` is the mirror — this picker's `maxDate` tracks `other.selectedDate`. The link applies the source's current `selectedDate` immediately, so it works even if `other` already has a date set when you call `linkAfter`. Both methods return the linked instance for chaining.
+
+Bounds are inclusive: same-day selections in both pickers are allowed.
+
+```javascript
+const start = new EasyEpoch('#start');
+const end = new EasyEpoch('#end');
+end.linkAfter(start);   // end >= start
+start.linkBefore(end);  // start <= end
+```
+
+### `EasyEpoch.linkRange(start, end)`
+
+Sugar for the from/to pattern. Equivalent to:
+
+```javascript
+end.linkAfter(start);
+start.linkBefore(end);
+```
+
+```javascript
+const start = new EasyEpoch('#start');
+const end = new EasyEpoch('#end');
+EasyEpoch.linkRange(start, end);
+```
+
 ## Theming
 
 EasyEpoch uses CSS custom properties for all colors and visual styles. The dark theme is the default.
