@@ -264,6 +264,16 @@
   pointer-events: none;
 }
 
+.easyepoch-calender tbody td[data-disabled] {
+  pointer-events: none;
+  color: var(--easyepoch-text-muted);
+  cursor: not-allowed;
+}
+
+.easyepoch-calender tbody td[data-disabled]:hover::after {
+  visibility: hidden;
+}
+
 .easyepoch-time-section {
   display: none;
   height: 120px;
