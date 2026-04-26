@@ -6,6 +6,9 @@ interface EasyEpochOpts {
     disableTimeSection?: boolean;
     selectedDate?: Date;
     theme?: EasyEpochTheme;
+    minDate?: Date;
+    maxDate?: Date;
+    showSeconds?: boolean;
 }
 type HandlerFunction = (...args: unknown[]) => void;
 interface EventHandlers {
@@ -36,24 +39,44 @@ declare class EasyEpoch {
     private $ok;
     private $displayDateElements;
     private $activeCell;
+    private $timeSection;
+    private $timeDisplay;
     private monthTracker;
+    private timeSectionDisabled;
+    private showSeconds;
+    private minDate?;
+    private maxDate?;
     constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts);
-    initElMethod(el: any): void;
+    initElMethod(el: HTMLElement): void;
     init(wrapper: HTMLElement, opts: EasyEpochOpts): void;
+    private startOfDay;
+    private isDateOutOfRange;
     reset(newDate?: Date): void;
     compactMode(): void;
     disableTimeSection(): void;
     enableTimeSection(): void;
+    private static readonly CSS_VAR_NAME_RE;
+    private static readonly UNSAFE_CSS_VALUE_RE;
+    private static readonly BANNED_KEYS;
     setTheme(theme: EasyEpochTheme): void;
     injectTemplate(el: HTMLElement): HTMLElement;
     clearRows(): void;
     updateDateComponents(date: Date): void;
-    render(data: any): void;
+    render(data: {
+        month: unknown[][];
+        date: Date;
+    }): void;
     updateSelectedDate(el?: HTMLElement): void;
     selectDateElement(el: HTMLElement): void;
-    findElementWithDate(date: any, returnLastIfNotFound?: boolean): any;
+    findElementWithDate(date: string, returnLastIfNotFound?: boolean): HTMLElement | undefined;
     handleIconButtonClick(el: HTMLElement): void;
     initListeners(): void;
+    private submit;
+    private cancelClose;
+    private handleKeydown;
+    private shiftSelectedDateBy;
+    private moveSelectionToDayOfMonth;
+    private moveSelectionTo;
     callEvent(event: EasyEpochEvent, dispatcher: (a: HandlerFunction) => void): void;
     open(): void;
     close(): void;
