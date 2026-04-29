@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: ['*']
 
+# Default minimal permissions at the workflow level. The sonarcloud job widens
+# to pull-requests:read so SonarCloud can decorate PRs with findings.
+permissions:
+  contents: read
+
 jobs:
   sonarcloud:
     name: SonarCloud Analysis

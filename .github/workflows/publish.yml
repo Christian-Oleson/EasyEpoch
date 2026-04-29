@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
 
+# Default minimal permissions for the test job. The publish job widens to
+# id-token:write so it can request the OIDC token for npm provenance.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ['*']
 
+# Default minimal permissions; jobs widen only as needed.
+permissions:
+  contents: read
+
 jobs:
   eslint:
     runs-on: ubuntu-latest

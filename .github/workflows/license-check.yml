@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Default minimal permissions; jobs widen only as needed.
+permissions:
+  contents: read
+
 jobs:
   license-check:
     runs-on: ubuntu-latest

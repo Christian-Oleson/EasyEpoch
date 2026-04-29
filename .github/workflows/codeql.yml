@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '25 14 * * 1' # Weekly on Monday
 
+# Default minimal permissions at the workflow level. The analyze job widens
+# to security-events:write so it can upload SARIF results.
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze
