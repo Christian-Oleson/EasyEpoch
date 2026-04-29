@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 8 * * 1' # Weekly on Monday
 
+# Default minimal permissions; jobs widen only as needed.
+permissions:
+  contents: read
+
 jobs:
   audit:
     runs-on: ubuntu-latest
