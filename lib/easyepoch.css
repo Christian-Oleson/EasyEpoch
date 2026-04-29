@@ -177,6 +177,27 @@
   outline: none;
 }
 
+/* Visible focus ring for keyboard users only (not on click). The dialog has
+ * roving tabindex on the calendar grid and standard focusable buttons; both
+ * need a clear keyboard indicator. */
+.easyepoch-icon:focus-visible,
+.easyepoch-btn:focus-visible {
+  outline: 2px solid var(--easyepoch-primary);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+.easyepoch-calender tbody td:focus-visible {
+  outline: 2px solid var(--easyepoch-primary);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.easyepoch-time-section input:focus-visible {
+  outline: 2px solid var(--easyepoch-primary);
+  outline-offset: 2px;
+}
+
 .easyepoch-icon svg {
   display: block;
   width: 100%;
