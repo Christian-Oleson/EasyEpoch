@@ -46,7 +46,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@rspack/cli": "^2.0.0",
-    "@rspack/core": "^1.7.5",
+    "@rspack/core": "^2.0.0",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.1.0",
     "eslint-plugin-security": "^4.0.0",
