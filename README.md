@@ -293,8 +293,33 @@ const picker = new EasyEpoch({
 | `selectTimeTitle` | Tooltip on the time-icon toggle button | English |
 | `okTitle` | Tooltip on the OK button | Mirrors `ok` if you set `ok`, otherwise English |
 | `cancelTitle` | Tooltip on the Cancel button | Mirrors `cancel` if you set `cancel`, otherwise English |
+| `previousMonthTitle` | Tooltip + ARIA label on the previous-month button | `Previous month` |
+| `nextMonthTitle` | Tooltip + ARIA label on the next-month button | `Next month` |
+| `dialogLabel` | Accessible name for the dialog itself (announced when the picker opens) | `Date picker` |
 
 The rendered time display always uses a 12-hour clock with `AM` / `PM` suffixes. `showSeconds` only controls precision, not the clock format. The browser's native `<input type="time">` widget may display in 24-hour form while the user is editing (browsers honor the OS locale here), but EasyEpoch's `selectedDate` is a normal `Date` so you can format it in any timezone/locale yourself in the `submit` handler.
+
+## Accessibility
+
+EasyEpoch is built to work with screen readers and keyboard-only users without any extra wiring on your part.
+
+- The picker overlay is a proper modal dialog: `role="dialog"`, `aria-modal="true"`, with an accessible name from `locale.dialogLabel` (default: `"Date picker"`).
+- The calendar table is announced as a grid (`role="grid"`), with `role="gridcell"` on every cell, `scope="col"` on the day-of-week headers, and `role="row"` on each row.
+- The selected cell carries `aria-selected="true"`. Out-of-range cells (when `minDate` / `maxDate` is set) and empty cells get `aria-disabled="true"`.
+- Icon-only buttons (calendar/time toggle, prev/next month) carry both a `title` and an `aria-label` from the locale, so assistive tech announces what each button does.
+- SVG icons are marked `aria-hidden="true"` so they aren't double-announced.
+
+**Focus management**
+
+- When `picker.open()` is called, EasyEpoch remembers the element that had focus and moves focus to the active calendar cell.
+- When the picker closes (OK, Cancel, overlay click, Escape, or `picker.close()`), focus is restored to whichever element had it before.
+- `Tab` and `Shift`+`Tab` are trapped within the dialog so keyboard users can't accidentally tab out into the page behind the modal.
+
+**Calendar grid keyboard pattern**
+
+The calendar grid uses the standard ARIA roving-tabindex pattern: only the active cell is in the tab sequence (`tabindex="0"`); all others are `tabindex="-1"`. Arrow / Home / End / PageUp/Dn move the active cell and follow it with focus, so screen readers announce the new date as the user navigates. See [Keyboard shortcuts](#keyboard-shortcuts) for the full key map.
+
+If you customize the picker via `setTheme()` and override `--easyepoch-primary`, the focus ring on cells and buttons inherits that color automatically.
 
 ## Development
 
