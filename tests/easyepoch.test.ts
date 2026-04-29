@@ -1085,6 +1085,68 @@ describe('Bug fixes', () => {
       const picker = new EasyEpoch();
       expect(document.activeElement).toBe(trigger);
     });
+
+    // Regression: refreshCalendar (called by setMinDate/setMaxDate) re-applies
+    // the .active class but used to skip aria-selected and tabindex=0, breaking
+    // the roving-tabindex invariant after a runtime bound update.
+    it('refreshCalendar restores aria-selected and tabindex=0 on the active cell', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 20) });
+      picker.setMinDate(new Date(2024, 5, 10));
+
+      const active = document.querySelector('.easyepoch-calender tbody td.active')!;
+      expect(active.getAttribute('aria-selected')).toBe('true');
+      expect(active.getAttribute('tabindex')).toBe('0');
+
+      // The grid still has exactly one tabbable cell.
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      const tabbable = Array.from(tds).filter(td => td.getAttribute('tabindex') === '0');
+      expect(tabbable.length).toBe(1);
+    });
+
+    it('refreshCalendar leaves no stale aria-selected when the active cell is now disabled', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 5) });
+      // June 5 becomes out-of-range; the active highlight is cleared.
+      picker.setMinDate(new Date(2024, 5, 10));
+
+      const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+      const stillSelected = Array.from(tds).filter(
+        td => td.getAttribute('aria-selected') === 'true'
+      );
+      expect(stillSelected.length).toBe(0);
+    });
+
+    // Regression: open() used to focus $activeCell unconditionally. If the user
+    // had toggled the time pane before closing, the active cell sits inside a
+    // display:none subtree on next open and focusing it leaves keyboard users
+    // with no visible focus indicator.
+    it('open falls back to a visible focusable when the active cell is in a hidden pane', () => {
+      const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+      // Force the calendar pane hidden (mirrors what the time-icon click does).
+      const calenderSection = document.querySelector('.easyepoch-calender-section') as HTMLElement;
+      calenderSection.style.display = 'none';
+
+      const elsewhere = document.createElement('button');
+      document.body.appendChild(elsewhere);
+      elsewhere.focus();
+
+      picker.open();
+      const wrapper = document.querySelector('.easyepoch-wrapper')!;
+      // Focus must be inside the dialog, but NOT on the now-hidden active cell.
+      expect(wrapper.contains(document.activeElement)).toBe(true);
+      const active = document.querySelector('.easyepoch-calender tbody td.active');
+      expect(document.activeElement).not.toBe(active);
+    });
+
+    // Regression: the template used to write `autofocus="false"`, but autofocus
+    // is a boolean attribute — its mere presence enables it, regardless of the
+    // value. With explicit focus management in open(), an unwanted autofocus
+    // can race the focus-target logic.
+    it('time input does not have an autofocus attribute', () => {
+      const picker = new EasyEpoch();
+      const input = document.querySelector('.easyepoch-time-section input') as HTMLInputElement;
+      expect(input.hasAttribute('autofocus')).toBe(false);
+      expect(input.autofocus).toBe(false);
+    });
   });
 
   describe('runtime setMinDate / setMaxDate', () => {

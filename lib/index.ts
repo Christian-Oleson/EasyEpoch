@@ -376,13 +376,17 @@ class EasyEpoch {
     const cur = this.monthTracker.current;
     if (!cur) return;
     this.render(dateUtil.scrapeMonth(cur, this.monthTracker));
-    // render() clears the active class on every cell; re-apply it for the
-    // current selection if that day is on the visible month and not disabled.
+    // render() clears the active class AND the aria-selected / tabindex=0 set
+    // by selectDateElement. Re-apply all three when the previous selection is
+    // still on the visible month and not disabled, so the roving-tabindex
+    // invariant (exactly one tabindex=0 in the grid) holds after the refresh.
     const sel = this.selectedDate;
     if (sel.getFullYear() === cur.getFullYear() && sel.getMonth() === cur.getMonth()) {
       const $td = this.findElementWithDate(sel.getDate().toString());
       if ($td && $td.dataset.disabled === undefined) {
         $td.classList.add('active');
+        $td.setAttribute('aria-selected', 'true');
+        $td.setAttribute('tabindex', '0');
         this.$activeCell = $td;
       } else {
         this.$activeCell = null;
@@ -515,7 +519,11 @@ class EasyEpoch {
         td.removeAttribute('data-disabled');
         if (!day) {
           td.setAttribute('data-empty', '');
-          // Empty cells are still gridcells; mark them disabled+hidden to AT.
+          // Empty cells stay as gridcells (so the grid keeps its row/col
+          // shape for SR navigation) but are marked aria-disabled so AT
+          // doesn't announce them as selectable. We deliberately don't set
+          // aria-hidden — that would make screen readers skip whole cells
+          // when arrowing across the grid, breaking the row structure.
           td.setAttribute('aria-disabled', 'true');
           return;
         }
@@ -932,10 +940,18 @@ class EasyEpoch {
 
     this.$easyepochWrapper.classList.add('active');
 
-    // Move focus into the dialog. The active calendar cell is the most useful
-    // landing spot for keyboard users; if there isn't one (e.g., date is
-    // out-of-range and was cleared) fall back to the OK button.
-    const target = this.$activeCell || this.$ok;
+    // Move focus into the dialog. Prefer the active calendar cell, but only if
+    // its pane is currently visible — if the user closed the picker while the
+    // time pane was up, the active cell is inside a display:none subtree, and
+    // focusing it leaves keyboard users with no visible focus indicator. In
+    // that case (or if there's no active cell at all) fall back to the first
+    // visible focusable element in the dialog, with OK as a last resort.
+    let target: HTMLElement | null;
+    if (this.$activeCell && !this.isInHiddenPane(this.$activeCell)) {
+      target = this.$activeCell;
+    } else {
+      target = this.getFocusableElements()[0] || this.$ok;
+    }
     if (target && typeof target.focus === 'function') {
       target.focus();
     }

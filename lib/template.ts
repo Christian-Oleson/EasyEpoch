@@ -39,7 +39,7 @@ export const htmlTemplate = `
           </div>
         </div>
         <div class="easyepoch-time-section">
-          <input type="time" value="12:00" autofocus="false" aria-label="Time">
+          <input type="time" value="12:00" aria-label="Time">
         </div>
       </div>
       <div class="easyepoch-bottom-part">
