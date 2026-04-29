@@ -42,32 +42,31 @@ describe('htmlTemplate', () => {
 
   it('should contain the calendar section with table', () => {
     expect(htmlTemplate).toContain('easyepoch-calender-section');
-    expect(htmlTemplate).toContain('<table>');
+    // The table now carries role="grid" for assistive tech.
+    expect(htmlTemplate).toMatch(/<table[^>]*>/);
+    expect(htmlTemplate).toContain('role="grid"');
     expect(htmlTemplate).toContain('<thead>');
     expect(htmlTemplate).toContain('<tbody>');
   });
 
   it('should contain all 7 day headers in the table', () => {
-    expect(htmlTemplate).toContain('<th>Sun</th>');
-    expect(htmlTemplate).toContain('<th>Mon</th>');
-    expect(htmlTemplate).toContain('<th>Tue</th>');
-    expect(htmlTemplate).toContain('<th>Wed</th>');
-    expect(htmlTemplate).toContain('<th>Thu</th>');
-    expect(htmlTemplate).toContain('<th>Fri</th>');
-    expect(htmlTemplate).toContain('<th>Sat</th>');
+    // Day-of-week headers carry scope="col" for screen readers.
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => {
+      expect(htmlTemplate).toMatch(new RegExp(`<th[^>]*>${d}</th>`));
+    });
   });
 
   it('should contain 6 rows of calendar cells (6 <tr> in tbody)', () => {
     const tbodyMatch = htmlTemplate.match(/<tbody>([\s\S]*?)<\/tbody>/);
     expect(tbodyMatch).not.toBeNull();
-    const trCount = (tbodyMatch![1].match(/<tr>/g) || []).length;
+    const trCount = (tbodyMatch![1].match(/<tr[^>]*>/g) || []).length;
     expect(trCount).toBe(6);
   });
 
   it('should contain 42 td cells (6 rows x 7 cols)', () => {
     const tbodyMatch = htmlTemplate.match(/<tbody>([\s\S]*?)<\/tbody>/);
     expect(tbodyMatch).not.toBeNull();
-    const tdCount = (tbodyMatch![1].match(/<td>/g) || []).length;
+    const tdCount = (tbodyMatch![1].match(/<td[^>]*>/g) || []).length;
     expect(tdCount).toBe(42);
   });
 
