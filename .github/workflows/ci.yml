@@ -15,7 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22, 24]
+        # PRs run a single Node version to save Actions minutes; pushes to
+        # main run the full 20/22/24 matrix so cross-version regressions
+        # still get caught before release.
+        node-version: ${{ fromJSON(github.event_name == 'pull_request' && '[22]' || '[20, 22, 24]') }}
     steps:
       - uses: actions/checkout@v6
 

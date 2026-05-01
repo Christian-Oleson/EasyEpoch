@@ -1,12 +1,17 @@
 name: CodeQL
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # CodeQL runs weekly only — push/PR triggers were burning ~5–10 min
+  # per run. Weekly + on-demand is sufficient coverage for a library
+  # repo and keeps Actions minutes bounded. Re-enable push/PR triggers
+  # below if a high-severity finding window opens.
   schedule:
     - cron: '25 14 * * 1' # Weekly on Monday
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
 
 # Default minimal permissions at the workflow level. The analyze job widens
 # to security-events:write so it can upload SARIF results.
