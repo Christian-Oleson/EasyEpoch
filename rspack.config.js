@@ -42,7 +42,11 @@ module.exports = function (env) {
               parser: {
                 syntax: 'typescript',
               },
-              target: 'es5',
+              // ES2017: the library already relies on unpolyfilled ES2015+
+              // APIs (Array.from, String.prototype.repeat, DOMParser), so an
+              // ES5 target never bought IE11 support - it only added class /
+              // spread / template-literal helpers to the bundle.
+              target: 'es2017',
             },
             module: {
               type: 'commonjs',

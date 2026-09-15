@@ -1,7 +1,16 @@
+// A month laid out as 6 rows x 7 columns (Sunday..Saturday); empty cells are
+// undefined.
+export type MonthGrid = (number | undefined)[][];
+
+export interface MonthData {
+  date: Date;
+  month: MonthGrid;
+}
+
 export interface MonthTracker {
-  years: object;
+  years: Record<number, Record<number, MonthGrid>>;
   current?: Date;
-};
+}
 
 export const monthTracker: MonthTracker = {
   years: {}
@@ -42,29 +51,25 @@ export function createMonthTracker(): MonthTracker {
   return { years: {} };
 }
 
-export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker) {
+export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker): MonthData {
   const originalDate = new Date(date.getTime());
   const year = date.getFullYear();
   const month = date.getMonth();
 
-  const data = {
-    date: originalDate,
-    month: undefined
-  };
-
   tracker.current = new Date(date.getTime());
   tracker.current.setDate(1);
-  tracker.years[year] = tracker.years[year] || {};
-  if (tracker.years[year][month] !== undefined) {
-    data.month = tracker.years[year][month];
-    return data;
+
+  const yearCache = tracker.years[year] || (tracker.years[year] = {});
+  const cached = yearCache[month];
+  if (cached !== undefined) {
+    return { date: originalDate, month: cached };
   }
 
   date = new Date(date.getTime());
   date.setDate(1);
-  tracker.years[year][month] = [];
+  const monthData: MonthGrid = [];
+  yearCache[month] = monthData;
 
-  const monthData = tracker.years[year][month];
   let rowTracker = 0;
   while (date.getMonth() === month) {
     const _date = date.getDate();
@@ -99,8 +104,7 @@ export function scrapeMonth(date: Date, tracker: MonthTracker = monthTracker) {
     monthData[lastRow] = filled;
   }
 
-  data.month = monthData;
-  return data;
+  return { date: originalDate, month: monthData };
 }
 
 export function scrapePreviousMonth(tracker: MonthTracker = monthTracker) {
@@ -138,31 +142,36 @@ export function getDisplayDate(_date: Date) {
   return date + 'th';
 }
 
-export function formatTimeFromInputElement(input: string, showSeconds: boolean = false) {
+const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+
+// Parse an <input type="time"> value ("HH:MM" or "HH:MM:SS") into 24h
+// components. Missing or out-of-range parts collapse to 0 so the result can
+// always be fed straight into a Date constructor.
+export function parseTimeInput(input: string): [number, number, number] {
   const parts = input.split(':');
-  if (parts.length < 2) return showSeconds ? '12:00:00 PM' : '12:00 PM';
+  const clamp = (raw: string | undefined, max: number) => {
+    const n = parseInt(raw || '', 10);
+    return isNaN(n) || n < 0 || n > max ? 0 : n;
+  };
+  return [clamp(parts[0], 23), clamp(parts[1], 59), clamp(parts[2], 59)];
+}
 
-  let hour = parseInt(parts[0], 10);
-  const minuteRaw = parseInt(parts[1], 10);
-  const secondRaw = showSeconds ? parseInt(parts[2] || '0', 10) : 0;
+// 24h components -> the value string an <input type="time"> expects.
+export function formatTimeInputValue(hours: number, minutes: number, seconds: number, showSeconds: boolean = false) {
+  return pad(hours) + ':' + pad(minutes) + (showSeconds ? ':' + pad(seconds) : '');
+}
 
-  // Clamp to valid ranges to prevent invalid Date construction
-  if (isNaN(hour) || hour < 0 || hour > 23) hour = 0;
-  const minute = isNaN(minuteRaw) || minuteRaw < 0 || minuteRaw > 59 ? 0 : minuteRaw;
-  const second = isNaN(secondRaw) || secondRaw < 0 || secondRaw > 59 ? 0 : secondRaw;
+// 24h components -> the 12-hour "HH:MM[:SS] AM/PM" display string.
+export function formatTime(hours: number, minutes: number, seconds: number, showSeconds: boolean = false) {
+  const isPM = hours >= 12;
+  const hour12 = hours % 12 || 12;
+  let timeString = pad(hour12) + ':' + pad(minutes);
+  if (showSeconds) timeString += ':' + pad(seconds);
+  return timeString + ' ' + (isPM ? 'PM' : 'AM');
+}
 
-  const isPM = hour >= 12;
-  if (isPM && hour > 12) {
-    hour = hour - 12;
-  }
-
-  if (!isPM && hour === 0) {
-    hour = 12;
-  }
-
-  const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
-  let timeString = pad(hour) + ':' + pad(minute);
-  if (showSeconds) timeString += ':' + pad(second);
-  timeString += ' ' + (isPM ? 'PM' : 'AM');
-  return timeString;
+export function formatTimeFromInputElement(input: string, showSeconds: boolean = false) {
+  if (input.split(':').length < 2) return showSeconds ? '12:00:00 PM' : '12:00 PM';
+  const [hours, minutes, seconds] = parseTimeInput(input);
+  return formatTime(hours, minutes, showSeconds ? seconds : 0, showSeconds);
 }

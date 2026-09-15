@@ -7,6 +7,9 @@ import {
   scrapeNextMonth,
   getDisplayDate,
   formatTimeFromInputElement,
+  parseTimeInput,
+  formatTime,
+  formatTimeInputValue,
   monthTracker,
 } from '../lib/date-util';
 
@@ -328,5 +331,51 @@ describe('scrapeNextMonth', () => {
     scrapeNextMonth(); // March
     const result = scrapeNextMonth(); // April
     expect(result.date.getMonth()).toBe(3);
+  });
+});
+
+describe('parseTimeInput', () => {
+  it('parses HH:MM', () => {
+    expect(parseTimeInput('14:30')).toEqual([14, 30, 0]);
+  });
+
+  it('parses HH:MM:SS', () => {
+    expect(parseTimeInput('09:05:07')).toEqual([9, 5, 7]);
+  });
+
+  it('clamps out-of-range and non-numeric parts to 0', () => {
+    expect(parseTimeInput('25:61:99')).toEqual([0, 0, 0]);
+    expect(parseTimeInput('')).toEqual([0, 0, 0]);
+    expect(parseTimeInput('ab:cd')).toEqual([0, 0, 0]);
+    expect(parseTimeInput('-1:30')).toEqual([0, 30, 0]);
+  });
+});
+
+describe('formatTime / formatTimeInputValue', () => {
+  it('formats midnight and noon on a 12-hour clock', () => {
+    expect(formatTime(0, 0, 0)).toBe('12:00 AM');
+    expect(formatTime(12, 0, 0)).toBe('12:00 PM');
+  });
+
+  it('formats afternoon hours, with seconds only when requested', () => {
+    expect(formatTime(15, 4, 9, true)).toBe('03:04:09 PM');
+    expect(formatTime(15, 4, 9)).toBe('03:04 PM');
+  });
+
+  it('produces valid <input type="time"> values', () => {
+    expect(formatTimeInputValue(7, 8, 9)).toBe('07:08');
+    expect(formatTimeInputValue(7, 8, 9, true)).toBe('07:08:09');
+  });
+
+  it('round-trips input value -> components -> display', () => {
+    const [h, m, s] = parseTimeInput(formatTimeInputValue(23, 59, 58, true));
+    expect(formatTime(h, m, s, true)).toBe('11:59:58 PM');
+  });
+
+  it('formatTimeFromInputElement matches formatTime for the same input', () => {
+    for (const v of ['00:00', '11:59', '12:00', '13:07', '23:59']) {
+      const [h, m] = parseTimeInput(v);
+      expect(formatTimeFromInputElement(v)).toBe(formatTime(h, m, 0));
+    }
   });
 });

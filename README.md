@@ -4,6 +4,10 @@ A lightweight datetime picker in vanilla JavaScript with zero dependencies.
 
 [Live Examples](https://christian-oleson.github.io/EasyEpoch/)
 
+[![npm version](https://img.shields.io/npm/v/easyepoch.svg)](https://www.npmjs.com/package/easyepoch)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-ffdd00?labelColor=1e2030)](https://www.buymeacoffee.com/christianoleson)
+
 EasyEpoch is a fork of [simplepicker](https://github.com/priyank-p/simplepicker) by Priyank Patel, originally based on [material-datetime-picker](https://github.com/ripjar/material-datetime-picker) but without relying on external dependencies like `moment`, `rome`, or `materialize`.
 
 ## Installation
@@ -114,6 +118,16 @@ Opens the picker. The picker closes automatically when the user clicks `Cancel` 
 ### `picker.close()`
 
 Closes the picker programmatically.
+
+### `picker.destroy()`
+
+Removes the picker from the DOM, detaches its document-level keyboard listener and clears all event handlers. Closes the picker first (restoring focus) if it is open. Call this before discarding an instance in single-page apps or anywhere pickers are re-created, so DOM nodes and listeners don't accumulate. Safe to call more than once.
+
+```javascript
+const picker = new EasyEpoch();
+// ...later, when the view unmounts:
+picker.destroy();
+```
 
 ### `picker.reset(date)`
 
@@ -328,6 +342,10 @@ npm start        # Dev server with hot reload
 npm run build    # Production build
 npm test         # Run tests
 ```
+
+## Support
+
+If EasyEpoch saves you some time, you can [buy me a coffee](https://www.buymeacoffee.com/christianoleson) ☕ — it helps keep the project maintained, tested and dependency-free.
 
 ## License
 

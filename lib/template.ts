@@ -1,4 +1,7 @@
-const calendarRow = '<tr role="row"><td role="gridcell"></td><td role="gridcell"></td><td role="gridcell"></td><td role="gridcell"></td><td role="gridcell"></td><td role="gridcell"></td><td role="gridcell"></td></tr>';
+// Every cell starts at tabindex="-1" (roving tabindex): render() only ever
+// has to touch the single cell it promotes to / demotes from tabindex="0".
+const calendarCell = '<td role="gridcell" tabindex="-1"></td>';
+const calendarRow = '<tr role="row">' + calendarCell.repeat(7) + '</tr>';
 
 const svgAttrs = 'xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"';
 

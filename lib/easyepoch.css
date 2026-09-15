@@ -338,7 +338,7 @@
   padding: 8px 20px;
   border-radius: 8px;
   color: var(--easyepoch-accent);
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s;
 }
 
 .easyepoch-btn:hover, .easyepoch-btn:active {

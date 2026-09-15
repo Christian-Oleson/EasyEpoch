@@ -2,12 +2,26 @@
   "compilerOptions": {
     "outDir": "./dist/",
     "module": "commonjs",
-    "lib": ["es6", "dom", "es2017"],
-    "target": "es5",
+    "lib": [
+      "es6",
+      "dom",
+      "es2017"
+    ],
+    "target": "es2017",
     "skipLibCheck": true,
     "esModuleInterop": true,
     "strictNullChecks": true,
-    "declaration": true
+    // Element fields are assigned in init() (called from the constructor),
+    // which definite-assignment analysis cannot follow.
+    "strictPropertyInitialization": false,
+    "declaration": true,
+    "rootDir": "lib"
   },
-  "exclude": ["node_modules", "tests"]
+  "exclude": [
+    "node_modules",
+    "tests"
+  ],
+  "include": [
+    "lib/**/*.ts"
+  ]
 }
