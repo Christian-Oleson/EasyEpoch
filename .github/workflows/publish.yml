@@ -6,6 +6,8 @@ name: Publish to npm
 # Settings -> Trusted Publishing -> GitHub Actions:
 #   repository owner: Christian-Oleson   repository: EasyEpoch
 #   workflow filename: publish.yml       environment: (leave blank)
+#   Allowed actions: tick "Allow npm publish" - otherwise the run can only
+#   stage the release and `npm publish` is refused at the finalize step.
 # Requires npm >= 11.5.1, which is why the publish job upgrades npm below.
 on:
   release:

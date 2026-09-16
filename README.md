@@ -349,7 +349,7 @@ Release notes live in [CHANGELOG.md](./CHANGELOG.md).
 
 1. Bump `version` in `package.json` (`npm version <x.y.z> --no-git-tag-version`), add a `CHANGELOG.md` entry, merge to `main`.
 2. Create a GitHub release with tag `v<x.y.z>`. The **Publish to npm** workflow runs the test matrix and publishes with provenance.
-3. Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. The trusted publisher is configured once on npmjs.com under the package's settings (GitHub Actions, workflow `publish.yml`). The workflow can also be re-run manually from the Actions tab (`workflow_dispatch`).
+3. Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. The trusted publisher is configured once on npmjs.com under the package's settings (GitHub Actions, owner `Christian-Oleson`, repository `EasyEpoch`, workflow `publish.yml`, environment blank) **and** its "Allowed actions" must have **Allow npm publish** enabled — without it the workflow authenticates and stages the release but the registry refuses to finalize it. The workflow can also be re-run manually from the Actions tab (`workflow_dispatch`).
 
 ## Support
 
