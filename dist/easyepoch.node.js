@@ -39,5 +39,5 @@
       </div>
   </div>
 </div>
-`}},t={};!function i(s){var a=t[s];if(void 0!==a)return a.exports;var n=t[s]={exports:{}};return e[s](n,n.exports,i),n.exports}(431)})();
+`}},t={},i=function i(s){var a=t[s];if(void 0!==a)return a.exports;var n=t[s]={exports:{}};return e[s](n,n.exports,i),n.exports}(431);module.exports=i})();
 //# sourceMappingURL=easyepoch.node.js.map
