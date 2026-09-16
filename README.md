@@ -347,9 +347,26 @@ Release notes live in [CHANGELOG.md](./CHANGELOG.md).
 
 ### Releasing
 
+Releases are two-phase: CI **stages** the package on npm, a maintainer **approves** it with 2FA. A compromised workflow can therefore never publish on its own.
+
 1. Bump `version` in `package.json` (`npm version <x.y.z> --no-git-tag-version`), add a `CHANGELOG.md` entry, merge to `main`.
-2. Create a GitHub release with tag `v<x.y.z>`. The **Publish to npm** workflow runs the test matrix and publishes with provenance.
-3. Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. The trusted publisher is configured once on npmjs.com under the package's settings (GitHub Actions, owner `Christian-Oleson`, repository `EasyEpoch`, workflow `publish.yml`, environment blank) **and** its "Allowed actions" must have **Allow npm publish** enabled — without it the workflow authenticates and stages the release but the registry refuses to finalize it. The workflow can also be re-run manually from the Actions tab (`workflow_dispatch`).
+2. Create a GitHub release with tag `v<x.y.z>`. The **Publish to npm** workflow runs the test matrix, builds, and runs `npm stage publish --provenance`. The tarball is now on npm but not installable and not tagged `latest`. The job summary shows the exact approve command.
+3. Approve from your own machine (prompts for your 2FA code):
+
+   ```bash
+   npm install -g npm@latest     # staged publishing needs npm >= 11.15
+   npm stage list easyepoch      # shows the staged version and its stage id
+   npm stage approve <stage-id>  # publishes it; or `npm stage reject <stage-id>` to discard
+   ```
+
+   A staged version occupies its version number: to re-stage the same version (e.g. after a fix), `npm stage reject` the old one first.
+
+Authentication uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. One-time setup on npmjs.com under the package's settings:
+
+- **Trusted Publishing** → GitHub Actions: owner `Christian-Oleson`, repository `EasyEpoch`, workflow `publish.yml`, environment blank. Under *Allowed actions*, `npm stage publish` is always allowed; leave **Allow npm publish** unticked so the workflow can only stage.
+- **Publishing access** → "Require two-factor authentication and disallow tokens".
+
+The workflow can also be run manually from the Actions tab (`workflow_dispatch`), e.g. to re-stage after rejecting a build.
 
 ## Support
 
