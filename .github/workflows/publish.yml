@@ -1,16 +1,32 @@
 name: Publish to npm
 
-# Publishes via npm Trusted Publishing (OIDC): GitHub Actions proves its
-# identity to the registry with a short-lived token, so no NPM_TOKEN secret is
-# stored or can expire. One-time setup on npmjs.com -> package "easyepoch" ->
-# Settings -> Trusted Publishing -> GitHub Actions:
-#   repository owner: Christian-Oleson   repository: EasyEpoch
-#   workflow filename: publish.yml       environment: (leave blank)
-# Requires npm >= 11.5.1, which is why the publish job upgrades npm below.
+# Two-phase release via npm Trusted Publishing (OIDC) + staged publishing:
+#
+#   1. This workflow authenticates to npm with a short-lived OIDC token (no
+#      NPM_TOKEN secret to store or expire) and runs `npm stage publish`,
+#      which builds and uploads the tarball with provenance but leaves it
+#      *staged* - not installable, not tagged `latest`.
+#   2. A maintainer approves it from their own machine with
+#      `npm stage approve <stage-id>` (prompts for 2FA). Only then is the
+#      version published.
+#
+# Staging keeps a human with 2FA in the loop: a compromised Action or
+# repository can at most leave a tarball waiting for approval, never ship
+# code to users. See `npm help stage`.
+#
+# One-time setup on npmjs.com -> package "easyepoch" -> Settings:
+#   Trusted Publishing -> GitHub Actions:
+#     repository owner: Christian-Oleson   repository: EasyEpoch
+#     workflow filename: publish.yml       environment: (leave blank)
+#     Allowed actions: `npm stage publish` is always allowed; leave
+#     "Allow npm publish" UNTICKED so this workflow cannot publish directly.
+#   Publishing access: "Require two-factor authentication and disallow tokens".
+# Requires npm >= 11.15, which is why the publish job upgrades npm below.
 on:
   release:
     types: [published]
-  # Manual re-run (e.g. after fixing the pipeline) without re-cutting the tag.
+  # Manual run (e.g. to re-stage after a rejected build) without re-cutting
+  # the tag.
   workflow_dispatch:
 
 # Default minimal permissions for the test job. The publish job widens to
@@ -55,7 +71,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      # Node 22 bundles npm 10.x; trusted publishing needs npm >= 11.5.1.
+      # Node 22 bundles npm 10.x; staged + trusted publishing need npm >= 11.15.
       - name: Upgrade npm for trusted publishing
         run: npm install -g npm@latest && npm --version
 
@@ -63,6 +79,40 @@ jobs:
         run: npm install --legacy-peer-deps
 
       # prepack runs `npm run build` (rspack bundles + tsc declarations), so
-      # what is published is always built from the tagged source.
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      # what is staged is always built from the tagged source. npm prints
+      # "+ easyepoch@x.y.z (staged with id <uuid>)"; the build's own output
+      # precedes it, so the id is picked out by pattern rather than by
+      # parsing stdout as JSON.
+      - name: Stage release on npm
+        id: stage
+        run: |
+          npm stage publish --provenance --access public 2>&1 | tee stage-output.txt
+          node -e '
+            const fs = require("fs");
+            const out = fs.readFileSync("stage-output.txt", "utf8");
+            const m = out.match(/staged with id ([0-9a-f-]{36})/i) || out.match(/"stageId"\s*:\s*"([0-9a-f-]{36})"/i);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `stage_id=${m ? m[1] : ""}\n`);
+          '
+
+      - name: Write approval instructions to the job summary
+        env:
+          STAGE_ID: ${{ steps.stage.outputs.stage_id }}
+          VERSION: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          {
+            echo "## easyepoch ${VERSION} is staged on npm - approval needed"
+            echo
+            echo "The tarball is uploaded with provenance but **not published**. A maintainer must approve it (2FA prompt):"
+            echo
+            echo '```bash'
+            echo "npm install -g npm@latest        # needs npm >= 11.15"
+            echo "npm stage list easyepoch         # confirm the staged version"
+            if [ -n "$STAGE_ID" ]; then
+              echo "npm stage approve ${STAGE_ID}"
+            else
+              echo "npm stage approve <stage-id>     # id from 'npm stage list'"
+            fi
+            echo '```'
+            echo
+            echo "To discard it instead: \`npm stage reject <stage-id>\` (also required before re-staging the same version)."
+          } >> "$GITHUB_STEP_SUMMARY"
