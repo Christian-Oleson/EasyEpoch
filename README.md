@@ -368,6 +368,19 @@ Authentication uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publ
 
 The workflow can also be run manually from the Actions tab (`workflow_dispatch`), e.g. to re-stage after rejecting a build.
 
+### Prereleases (trying a branch before it is released)
+
+To test a feature branch as a real npm install without touching `latest`:
+
+1. Actions → **Publish to npm** → *Run workflow* → pick the **branch**, set *channel* to `next` (or `beta` / `rc`), leave *version* blank.
+2. CI tests and stages `<package.json version>-next.<run>.g<sha>` (for example `2.0.0-next.12.gf0f52f3`) under the `next` dist-tag. The job summary shows the approve command.
+3. Approve it as for a release: `npm stage approve <stage-id>` (2FA).
+4. Install it anywhere: `npm install easyepoch@next` (newest prerelease on that channel) or `npm install easyepoch@2.0.0-next.12.gf0f52f3` (that exact build).
+
+Prereleases never move `latest`, so `npm install easyepoch` is unaffected. Set *version* explicitly (e.g. `2.1.0-beta.1`) when you want a human-readable prerelease series. The version is rewritten only in the workflow's checkout — nothing is committed — and provenance still points at the exact commit that was built. Prereleases run through the same trusted publisher (npm allows one per package, matched on the workflow filename), which is why they live in `publish.yml`.
+
+For a quick local try without publishing anything, `npm install github:Christian-Oleson/EasyEpoch#<branch>` also works because `dist/` is committed — but only if that branch's `dist/` has been rebuilt (`npm run build`).
+
 ## Support
 
 If EasyEpoch saves you some time, you can [buy me a coffee](https://www.buymeacoffee.com/christianoleson) ☕ — it helps keep the project maintained, tested and dependency-free.
