@@ -82,6 +82,41 @@
       margin: 0 4px;
     }
 
+    header .support {
+      margin-top: 22px;
+      position: relative;
+    }
+
+    .coffee-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: #ffdd00;
+      color: #0f1117;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      box-shadow: 0 4px 16px rgba(255, 221, 0, 0.25);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .coffee-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .coffee-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(255, 221, 0, 0.4);
+    }
+
+    .coffee-btn:focus-visible {
+      outline: 2px solid #ffdd00;
+      outline-offset: 3px;
+    }
+
     .container {
       max-width: 900px;
       margin: 0 auto;
@@ -321,6 +356,12 @@
   <div class="badges">
     <a href="https://www.npmjs.com/package/easyepoch"><img src="https://img.shields.io/npm/v/easyepoch.svg" alt="npm version"></a>
     <a href="https://github.com/Christian-Oleson/EasyEpoch/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  </div>
+  <div class="support">
+    <a class="coffee-btn" href="https://www.buymeacoffee.com/christianoleson" target="_blank" rel="noopener">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+      Buy me a coffee
+    </a>
   </div>
 </header>
 
@@ -640,6 +681,7 @@ picker.<span class="code-function">on</span>(<span class="code-string">'close'</
   <p>
     <a href="https://github.com/Christian-Oleson/EasyEpoch">GitHub</a> &middot;
     <a href="https://www.npmjs.com/package/easyepoch">npm</a> &middot;
+    <a href="https://www.buymeacoffee.com/christianoleson" target="_blank" rel="noopener">Buy me a coffee</a> &middot;
     MIT License
   </p>
 </footer>
@@ -835,7 +877,9 @@ picker.<span class="code-function">on</span>(<span class="code-string">'close'</
 
     function buildPicker() {
       // Re-create on each open so changing the dropdown picks the new locale.
-      if (picker) picker.close();
+      // destroy() removes the old overlay and its keyboard listener so
+      // instances don't pile up as the user switches languages.
+      if (picker) picker.destroy();
       picker = new EasyEpoch({ zIndex: 10, locale: locales[lang.value] });
       picker.on('submit', function(date, readableDate) {
         output.textContent = 'Selected: ' + readableDate;

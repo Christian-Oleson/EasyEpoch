@@ -4,6 +4,7 @@
   "description": "A lightweight datetime picker in vanilla JavaScript with zero dependencies.",
   "main": "./dist/easyepoch.node.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "require": "./dist/easyepoch.node.js",
@@ -13,8 +14,9 @@
   },
   "scripts": {
     "start": "rspack serve --hot",
-    "prepack": "rspack build --mode production --env production",
-    "build": "rspack build --mode production --env production",
+    "prepack": "npm run build",
+    "build": "rspack build --mode production --env production && npm run build:types",
+    "build:types": "tsc --emitDeclarationOnly -p tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint lib/"
@@ -43,6 +45,10 @@
     "url": "https://github.com/Christian-Oleson/EasyEpoch/issues"
   },
   "homepage": "https://github.com/Christian-Oleson/EasyEpoch#readme",
+  "funding": {
+    "type": "buymeacoffee",
+    "url": "https://www.buymeacoffee.com/christianoleson"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@rspack/cli": "^2.0.0",

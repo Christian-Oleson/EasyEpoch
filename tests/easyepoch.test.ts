@@ -1707,3 +1707,130 @@ describe('Bug fixes', () => {
     });
   });
 });
+
+describe('EasyEpoch.destroy()', () => {
+  function pressKey(k: string) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+  }
+
+  it('removes the picker DOM and detaches the document keydown listener', () => {
+    const picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15) });
+    picker.open();
+    expect(document.querySelector('.easyepoch-wrapper')).not.toBeNull();
+
+    const spy = vi.spyOn(document, 'removeEventListener');
+    picker.destroy();
+    expect(spy).toHaveBeenCalledWith('keydown', expect.any(Function));
+    spy.mockRestore();
+
+    expect(document.querySelector('.easyepoch-wrapper')).toBeNull();
+    pressKey('ArrowRight');
+    expect(picker.selectedDate.getDate()).toBe(15);
+  });
+
+  it('restores focus to the previously focused element when destroyed while open', () => {
+    const btn = document.createElement('button');
+    document.body.appendChild(btn);
+    btn.focus();
+
+    const picker = new EasyEpoch();
+    picker.open();
+    expect(document.activeElement).not.toBe(btn);
+
+    picker.destroy();
+    expect(document.activeElement).toBe(btn);
+  });
+
+  it('drops registered handlers and is safe to call twice', () => {
+    const picker = new EasyEpoch();
+    const handler = vi.fn();
+    picker.on('submit', handler);
+
+    picker.destroy();
+    expect(() => picker.destroy()).not.toThrow();
+
+    expect(picker._eventHandlers).toEqual({});
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe('EasyEpoch pane toggle', () => {
+  it('does not toggle the header fade when the already-active pane icon is clicked', () => {
+    new EasyEpoch();
+    const calIcon = document.querySelector('.easyepoch-icon-calender') as HTMLElement;
+    const dateEl = document.querySelector('.easyepoch-date') as HTMLElement;
+
+    expect(dateEl.classList.contains('easyepoch-fade')).toBe(false);
+    calIcon.click();
+    calIcon.click();
+    expect(dateEl.classList.contains('easyepoch-fade')).toBe(false);
+    expect(calIcon.classList.contains('active')).toBe(true);
+  });
+
+  it('fades the date header on the time pane and restores it on the calendar pane', () => {
+    new EasyEpoch();
+    const calIcon = document.querySelector('.easyepoch-icon-calender') as HTMLElement;
+    const timeIcon = document.querySelector('.easyepoch-icon-time') as HTMLElement;
+    const dateEl = document.querySelector('.easyepoch-date') as HTMLElement;
+    const timeSection = document.querySelector('.easyepoch-time-section') as HTMLElement;
+
+    timeIcon.click();
+    expect(dateEl.classList.contains('easyepoch-fade')).toBe(true);
+    expect(timeSection.style.display).toBe('block');
+
+    calIcon.click();
+    expect(dateEl.classList.contains('easyepoch-fade')).toBe(false);
+    expect(timeSection.style.display).toBe('none');
+  });
+});
+
+describe('EasyEpoch calendar layout', () => {
+  it('clamps the selected day to the last day when navigating into a shorter month', () => {
+    const picker = new EasyEpoch({ selectedDate: new Date(2024, 4, 31) }); // May 31
+    const next = document.querySelector('.easyepoch-icon-next') as HTMLElement;
+
+    next.click(); // June has 30 days
+    expect(picker.selectedDate.getMonth()).toBe(5);
+    expect(picker.selectedDate.getDate()).toBe(30);
+
+    const active = document.querySelector('.easyepoch-calender tbody td.active')!;
+    expect(active.textContent).toBe('30');
+    const tabbable = document.querySelectorAll('.easyepoch-calender tbody td[tabindex="0"]');
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0]).toBe(active);
+  });
+
+  it('places the 1st in the correct column and hides the unused sixth row', () => {
+    new EasyEpoch({ selectedDate: new Date(2026, 1, 1) }); // Feb 2026: starts Sunday, 28 days
+    const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+    expect(tds[0].textContent).toBe('1');
+    expect(tds[27].textContent).toBe('28');
+    expect(tds[28].getAttribute('data-empty')).not.toBeNull();
+
+    const rows = document.querySelectorAll('.easyepoch-calender tbody tr');
+    expect((rows[5] as HTMLElement).style.display).toBe('none');
+  });
+
+  it('shows the sixth row for months that spill into it', () => {
+    new EasyEpoch({ selectedDate: new Date(2024, 5, 15) }); // June 2024: starts Saturday, 30 days
+    const tds = document.querySelectorAll('.easyepoch-calender tbody td');
+    expect(tds[6].textContent).toBe('1');
+    expect(tds[35].textContent).toBe('30');
+
+    const rows = document.querySelectorAll('.easyepoch-calender tbody tr');
+    expect((rows[5] as HTMLElement).style.display).toBe('table-row');
+  });
+
+  it('keeps the time display, input value and selectedDate in sync after reset()', () => {
+    const picker = new EasyEpoch({ showSeconds: true });
+    picker.reset(new Date(2024, 0, 1, 23, 59, 58));
+
+    const input = document.querySelector('.easyepoch-time-section input') as HTMLInputElement;
+    const display = document.querySelector('.easyepoch-time') as HTMLElement;
+    expect(input.value).toBe('23:59:58');
+    expect(display.textContent).toBe('11:59:58 PM');
+    expect(picker.selectedDate.getHours()).toBe(23);
+    expect(picker.selectedDate.getSeconds()).toBe(58);
+    expect(picker.readableDate).toBe('1st January 2024 11:59:58 PM');
+  });
+});

@@ -1,5 +1,5 @@
 import * as dateUtil from './date-util';
-import { MonthTracker } from './date-util';
+import { MonthData, MonthTracker } from './date-util';
 import { htmlTemplate } from './template';
 
 type EasyEpochEvent = 'submit' | 'close';
@@ -73,6 +73,21 @@ interface EventHandlers {
   [key: string]: HandlerFunction[];
 }
 
+// The picker markup is parsed once per page and then cloned per instance:
+// cloning a DOM subtree is far cheaper than re-parsing the HTML string every
+// time a picker is constructed, and it is what dominated construction cost.
+let templateWrapper: HTMLElement | null = null;
+
+function getTemplateWrapper(): HTMLElement {
+  if (!templateWrapper) {
+    // DOMParser (not innerHTML) so static analysis (CodeQL js/xss-through-dom)
+    // can see the constant markup never touches the live document directly.
+    const doc = new DOMParser().parseFromString(htmlTemplate, 'text/html');
+    templateWrapper = doc.querySelector('.easyepoch-wrapper') as HTMLElement;
+  }
+  return templateWrapper;
+}
+
 class EasyEpoch {
   selectedDate: Date;
   $easyEpoch: HTMLElement;
@@ -101,13 +116,29 @@ class EasyEpoch {
   private $activeCell: HTMLElement | null;
   private $timeSection: HTMLElement;
   private $timeDisplay: HTMLElement;
+  private $calenderIcon: HTMLElement;
+  private $calenderSection: HTMLElement;
   private monthTracker: MonthTracker;
   private timeSectionDisabled: boolean;
   private showSeconds: boolean;
-  private minDate?: Date;
-  private maxDate?: Date;
+  // Selectable range as integer day keys (see dayKey). Comparing integers
+  // lets render() range-check 31 cells without allocating a Date per cell.
+  private minKey?: number;
+  private maxKey?: number;
+  // Layout of the month currently on screen: the cell index holding the 1st
+  // and the number of days. Together they make day -> cell an O(1) index
+  // lookup instead of a 42-cell text scan.
+  private firstDayOffset = 0;
+  private daysInMonth = 0;
+  // Time state as 24h components. The display string and selectedDate are
+  // derived from these instead of being parsed back out of the DOM.
+  private hours = 12;
+  private minutes = 0;
+  private seconds = 0;
+  private timeText = '12:00 PM';
   private locale: ResolvedLocale;
   private previouslyFocused: HTMLElement | null = null;
+  private destroyed = false;
 
   constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts) {
     let el: HTMLElement | undefined = undefined;
@@ -166,10 +197,12 @@ class EasyEpoch {
     this.$date = $('.easyepoch-date');
     this.$day = $('.easyepoch-day-header');
     this.$time = $('.easyepoch-time');
-    this.$timeInput = $('.easyepoch-time-section input');
+    this.$timeInput = $('.easyepoch-time-section input') as HTMLInputElement;
     this.$timeSection = $('.easyepoch-time-section');
     this.$timeSectionIcon = $('.easyepoch-icon-time');
-    this.$timeDisplay = $('.easyepoch-time');
+    this.$timeDisplay = this.$time;
+    this.$calenderIcon = $('.easyepoch-icon-calender');
+    this.$calenderSection = $('.easyepoch-calender-section');
     this.$cancel = $('.easyepoch-cancel-btn');
     this.$ok = $('.easyepoch-ok-btn');
 
@@ -188,8 +221,8 @@ class EasyEpoch {
 
     this.timeSectionDisabled = false;
     this.showSeconds = opts.showSeconds === true;
-    this.minDate = opts.minDate ? this.startOfDay(opts.minDate) : undefined;
-    this.maxDate = opts.maxDate ? this.startOfDay(opts.maxDate) : undefined;
+    this.minKey = opts.minDate ? EasyEpoch.dayKey(opts.minDate) : undefined;
+    this.maxKey = opts.maxDate ? EasyEpoch.dayKey(opts.maxDate) : undefined;
     // Locale must be set before the first render so updateDateComponents can
     // read this.locale.months / this.locale.days when laying out the header.
     this.locale = this.resolveLocale(opts.locale);
@@ -200,10 +233,9 @@ class EasyEpoch {
       this.$timeInput.value = '12:00:00';
     }
 
-    const now = new Date();
-    this.render(dateUtil.scrapeMonth(now, this.monthTracker));
-
-    this.reset(opts.selectedDate || now);
+    // reset() renders the month of the initial date itself, so rendering
+    // "now" first would just be thrown away.
+    this.reset(opts.selectedDate || new Date());
 
     if (opts.zIndex !== undefined) {
       this.$easyepochWrapper.style.zIndex = opts.zIndex.toString();
@@ -220,8 +252,13 @@ class EasyEpoch {
     this.setTheme(opts.theme || 'dark');
   }
 
-  private startOfDay(d: Date): Date {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  // Collapse a calendar day to an integer that orders the same way dates do
+  // (year * 10000 + month * 100 + day). Only used for comparisons.
+  private static dayKey(y: number | Date, m?: number, d?: number): number {
+    if (y instanceof Date) {
+      return y.getFullYear() * 10000 + y.getMonth() * 100 + y.getDate();
+    }
+    return y * 10000 + (m as number) * 100 + (d as number);
   }
 
   private resolveLocale(input?: EasyEpochLocale): ResolvedLocale {
@@ -301,11 +338,10 @@ class EasyEpoch {
   }
 
   private isDateOutOfRange(year: number, month: number, day: number): boolean {
-    if (!this.minDate && !this.maxDate) return false;
-    const ts = new Date(year, month, day).getTime();
-    if (this.minDate && ts < this.minDate.getTime()) return true;
-    if (this.maxDate && ts > this.maxDate.getTime()) return true;
-    return false;
+    const { minKey, maxKey } = this;
+    if (minKey === undefined && maxKey === undefined) return false;
+    const key = EasyEpoch.dayKey(year, month, day);
+    return (minKey !== undefined && key < minKey) || (maxKey !== undefined && key > maxKey);
   }
 
   // Reset by selecting current date.
@@ -313,13 +349,7 @@ class EasyEpoch {
     const date = newDate || new Date();
     this.render(dateUtil.scrapeMonth(date, this.monthTracker));
 
-    // toTimeString() yields "HH:MM:SS GMT…". Take just the clock part.
-    // When showSeconds is off we strip the trailing :SS so the <input type="time">
-    // value matches its (default) HH:MM precision.
-    const timeFull = date.toTimeString().split(' ')[0];
-    const time = this.showSeconds ? timeFull : timeFull.replace(/:\d\d$/, '');
-    this.$timeInput.value = time;
-    this.$time.textContent = dateUtil.formatTimeFromInputElement(time, this.showSeconds);
+    this.setTime(date.getHours(), date.getMinutes(), this.showSeconds ? date.getSeconds() : 0);
 
     const dateString = date.getDate().toString();
     const $dateEl = this.findElementWithDate(dateString);
@@ -327,6 +357,21 @@ class EasyEpoch {
       this.selectDateElement($dateEl);
       this.updateDateComponents(date);
     }
+  }
+
+  // Single writer for the time state: keeps the 24h components, the
+  // <input type="time"> value and the AM/PM display text in sync. syncInput
+  // is false when the change originated from the input itself, so we don't
+  // write a value back into a control the user is mid-way through editing.
+  private setTime(hours: number, minutes: number, seconds: number, syncInput: boolean = true) {
+    this.hours = hours;
+    this.minutes = minutes;
+    this.seconds = seconds;
+    if (syncInput) {
+      this.$timeInput.value = dateUtil.formatTimeInputValue(hours, minutes, seconds, this.showSeconds);
+    }
+    this.timeText = dateUtil.formatTime(hours, minutes, seconds, this.showSeconds);
+    this.$time.textContent = this.timeText;
   }
 
   compactMode() {
@@ -341,12 +386,9 @@ class EasyEpoch {
     this.$timeSection.style.display = 'none';
     // Force the calendar pane to be the visible one so the user can't be stranded
     // on a hidden time pane if disable was toggled while time was active.
-    const calenderIcon = this.$('.easyepoch-icon-calender');
-    const timeIcon = this.$('.easyepoch-icon-time');
-    const calenderSection = this.$('.easyepoch-calender-section');
-    if (calenderIcon) calenderIcon.classList.add('active');
-    if (timeIcon) timeIcon.classList.remove('active');
-    if (calenderSection) calenderSection.style.display = 'block';
+    this.$calenderIcon.classList.add('active');
+    this.$timeSectionIcon.classList.remove('active');
+    this.$calenderSection.style.display = 'block';
     this.updateSelectedDate();
   }
 
@@ -363,12 +405,12 @@ class EasyEpoch {
   // new constraint. The previously-selected cell stays selected if it's still
   // in range and on the visible month.
   setMinDate(date?: Date): void {
-    this.minDate = date ? this.startOfDay(date) : undefined;
+    this.minKey = date ? EasyEpoch.dayKey(date) : undefined;
     this.refreshCalendar();
   }
 
   setMaxDate(date?: Date): void {
-    this.maxDate = date ? this.startOfDay(date) : undefined;
+    this.maxKey = date ? EasyEpoch.dayKey(date) : undefined;
     this.refreshCalendar();
   }
 
@@ -472,25 +514,9 @@ class EasyEpoch {
   }
 
   injectTemplate(el: HTMLElement): HTMLElement {
-    // Use DOMParser instead of innerHTML to avoid XSS concerns (CodeQL js/xss-through-dom).
-    // The template is a compile-time constant, but using DOMParser makes that guarantee
-    // enforceable by static analysis and prevents future regressions.
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlTemplate, 'text/html');
-    const wrapper = doc.querySelector('.easyepoch-wrapper') as HTMLElement;
-    const importedNode = document.importNode(wrapper, true);
+    const importedNode = document.importNode(getTemplateWrapper(), true) as HTMLElement;
     el.appendChild(importedNode);
     return importedNode;
-  }
-
-  clearRows() {
-    this.$tds.forEach((td) => {
-      td.textContent = '';
-      td.classList.remove('active');
-      td.removeAttribute('aria-selected');
-      td.removeAttribute('aria-disabled');
-      td.setAttribute('tabindex', '-1');
-    });
   }
 
   updateDateComponents(date: Date) {
@@ -505,108 +531,89 @@ class EasyEpoch {
     this.$date.textContent = dateUtil.getDisplayDate(date);
   }
 
-  render(data: { month: unknown[][]; date: Date }) {
-    const { $trs, $lastRow } = this;
+  render(data: MonthData) {
+    const { $tds, $lastRow } = this;
     const { month, date } = data;
     const renderedYear = date.getFullYear();
     const renderedMonth = date.getMonth();
+    const hasRange = this.minKey !== undefined || this.maxKey !== undefined;
 
-    this.clearRows();
-    month.forEach((week, index) => {
-      const $tds = $trs[index].children;
-      week.forEach((day, index) => {
-        const td = $tds[index];
+    // Drop the previous selection. Every cell carries tabindex="-1" from the
+    // template, so only the one that was promoted to tabindex="0" needs
+    // resetting - not all 42.
+    const prev = this.$activeCell;
+    if (prev) {
+      prev.classList.remove('active');
+      prev.removeAttribute('aria-selected');
+      prev.setAttribute('tabindex', '-1');
+      this.$activeCell = null;
+    }
+
+    let firstDayOffset = -1;
+    let daysInMonth = 0;
+
+    // One pass over the 6x7 grid writing each cell's final text + attributes.
+    for (let i = 0; i < 42; i++) {
+      const td = $tds[i];
+      const day = month[(i / 7) | 0][i % 7];
+
+      if (!day) {
+        td.textContent = '';
         td.removeAttribute('data-disabled');
-        if (!day) {
-          td.setAttribute('data-empty', '');
-          // Empty cells stay as gridcells (so the grid keeps its row/col
-          // shape for SR navigation) but are marked aria-disabled so AT
-          // doesn't announce them as selectable. We deliberately don't set
-          // aria-hidden — that would make screen readers skip whole cells
-          // when arrowing across the grid, breaking the row structure.
-          td.setAttribute('aria-disabled', 'true');
-          return;
-        }
+        td.setAttribute('data-empty', '');
+        // Empty cells stay as gridcells (so the grid keeps its row/col
+        // shape for SR navigation) but are marked aria-disabled so AT
+        // doesn't announce them as selectable. We deliberately don't set
+        // aria-hidden — that would make screen readers skip whole cells
+        // when arrowing across the grid, breaking the row structure.
+        td.setAttribute('aria-disabled', 'true');
+        continue;
+      }
 
-        td.removeAttribute('data-empty');
-        td.textContent = day as string;
+      if (firstDayOffset < 0) firstDayOffset = i;
+      daysInMonth++;
 
-        if (this.isDateOutOfRange(renderedYear, renderedMonth, day as number)) {
-          td.setAttribute('data-disabled', '');
-          td.setAttribute('aria-disabled', 'true');
-        }
-      });
-    });
-
-    // hide last row if it's empty to avoid extra spacing
-    const lastRowCells = $lastRow.children;
-    let lastRowIsEmpty = true;
-    for (let i = 0; i < lastRowCells.length; i++) {
-      if (!(lastRowCells[i] as HTMLElement).hasAttribute('data-empty')) {
-        lastRowIsEmpty = false;
-        break;
+      td.textContent = '' + day;
+      td.removeAttribute('data-empty');
+      if (hasRange && this.isDateOutOfRange(renderedYear, renderedMonth, day)) {
+        td.setAttribute('data-disabled', '');
+        td.setAttribute('aria-disabled', 'true');
+      } else {
+        td.removeAttribute('data-disabled');
+        td.removeAttribute('aria-disabled');
       }
     }
 
-    $lastRow.style.display = lastRowIsEmpty ? 'none' : 'table-row';
+    this.firstDayOffset = firstDayOffset < 0 ? 0 : firstDayOffset;
+    this.daysInMonth = daysInMonth;
+
+    // The 6th row (cells 35-41) is only needed when the month spills into
+    // it; hide it otherwise to avoid a blank strip of padding.
+    $lastRow.style.display = firstDayOffset + daysInMonth > 35 ? 'table-row' : 'none';
 
     this.updateDateComponents(date);
   }
 
   updateSelectedDate(el?: HTMLElement) {
-    const { $monthAndYear, $time, $date } = this;
+    // Day-of-month: from the clicked cell when given, otherwise from the big
+    // date display (minus its ordinal suffix).
+    const dayText = el
+      ? (el.textContent || '').trim()
+      : (this.$date.textContent || '').replace(/[a-z]+/, '');
+    const dayNum = parseInt(dayText, 10) || 1;
 
-    let day: string;
-    if (el) {
-      day = (el.textContent || '').trim();
-    } else {
-      day = ($date.textContent || '').replace(/[a-z]+/, '');
-    }
-
-    const monthAndYearText = ($monthAndYear.textContent || '').trim();
-    // The header text is "<localized month> <year>". We rsplit on the last
-    // space so multi-word month names (very rare, but cheap to support) survive.
-    const lastSpace = monthAndYearText.lastIndexOf(' ');
-    const monthName = lastSpace >= 0 ? monthAndYearText.slice(0, lastSpace) : monthAndYearText;
-    const year = lastSpace >= 0 ? monthAndYearText.slice(lastSpace + 1) : '0';
-    const month = this.locale.months.indexOf(monthName);
-
-    let hours = 0;
-    let minutes = 0;
-    let seconds = 0;
-    const timeText = ($time.textContent || '').trim();
-
-    if (!this.timeSectionDisabled) {
-      const timeComponents = timeText.split(':');
-      hours = parseInt(timeComponents[0], 10) || 0;
-      const minutePart = timeComponents[1] || '';
-      // With seconds: "MM" then "SS AM/PM"; without seconds: "MM AM/PM".
-      if (this.showSeconds && timeComponents.length >= 3) {
-        minutes = parseInt(minutePart, 10) || 0;
-        const secPart = (timeComponents[2] || '').split(' ');
-        seconds = parseInt(secPart[0], 10) || 0;
-        const meridium = secPart[1] || '';
-        if (meridium === 'AM' && hours === 12) hours = 0;
-        if (meridium === 'PM' && hours < 12) hours += 12;
-      } else {
-        const minSplit = minutePart.split(' ');
-        minutes = parseInt(minSplit[0], 10) || 0;
-        const meridium = minSplit[1] || '';
-        if (meridium === 'AM' && hours === 12) hours = 0;
-        if (meridium === 'PM' && hours < 12) hours += 12;
-      }
-    }
-
-    const dayNum = parseInt(day, 10) || 1;
-    const yearNum = parseInt(year, 10) || new Date().getFullYear();
-    const date = new Date(yearNum, month >= 0 ? month : 0, dayNum, hours, minutes, seconds);
+    // Month and year come straight from the tracker (which is what render()
+    // drew) rather than being parsed back out of the localized header text.
+    const view = this.monthTracker.current || new Date();
+    const withTime = !this.timeSectionDisabled;
+    const date = withTime
+      ? new Date(view.getFullYear(), view.getMonth(), dayNum, this.hours, this.minutes, this.seconds)
+      : new Date(view.getFullYear(), view.getMonth(), dayNum);
     this.selectedDate = date;
 
-    let _date = day + ' ' + monthAndYearText;
-    if (!this.timeSectionDisabled) {
-      _date += ' ' + timeText;
-    }
-    this.readableDate = _date.replace(/^\d+/, dateUtil.getDisplayDate(date));
+    let readable = dateUtil.getDisplayDate(date) + ' ' + this.$monthAndYear.textContent;
+    if (withTime) readable += ' ' + this.timeText;
+    this.readableDate = readable;
   }
 
   selectDateElement(el: HTMLElement) {
@@ -634,75 +641,59 @@ class EasyEpoch {
     }
   }
 
+  // Cell for a day-of-month in the rendered month, by index arithmetic. With
+  // returnLastIfNotFound, a day past the end of the month yields the last
+  // day's cell (used when navigating e.g. from the 31st into a 30-day month).
   findElementWithDate(date: string, returnLastIfNotFound: boolean = false) {
-    const { $tds } = this;
-
-    let lastTd;
-    for (let i = 0; i < $tds.length; i++) {
-      const td = $tds[i];
-      const content = td.textContent!.trim();
-      if (content === date) {
-        return td;
-      }
-      if (content !== '') {
-        lastTd = td;
-      }
+    const { $tds, firstDayOffset, daysInMonth } = this;
+    const day = parseInt(date, 10);
+    if (day >= 1 && day <= daysInMonth) {
+      return $tds[firstDayOffset + day - 1];
     }
-
-    return returnLastIfNotFound ? lastTd : undefined;
+    return returnLastIfNotFound && daysInMonth > 0
+      ? $tds[firstDayOffset + daysInMonth - 1]
+      : undefined;
   }
 
   handleIconButtonClick(el: HTMLElement) {
-    const { $ } = this;
-    const baseClass = 'easyepoch-icon-';
-    const nextIcon = baseClass + 'next';
-    const previousIcon = baseClass + 'previous';
-    const calenderIcon = baseClass + 'calender';
-    const timeIcon = baseClass + 'time';
+    const cls = el.classList;
 
-    if (el.classList.contains(calenderIcon)) {
-      const $timeIcon = $('.' + timeIcon);
-      const $timeSection = $('.easyepoch-time-section');
-      const $calenderSection = $('.easyepoch-calender-section');
-
-      $calenderSection.style.display = 'block';
-      $timeSection.style.display = 'none';
-      $timeIcon.classList.remove('active');
-      el.classList.add('active');
+    if (cls.contains('easyepoch-icon-calender')) {
+      // Already on the calendar pane: nothing to switch (and toggling the
+      // fade again would wrongly grey out the date header).
+      if (cls.contains('active')) return;
+      this.$calenderSection.style.display = 'block';
+      this.$timeSection.style.display = 'none';
+      this.$timeSectionIcon.classList.remove('active');
+      cls.add('active');
       this.toggleDisplayFade();
       return;
     }
 
-    if (el.classList.contains(timeIcon)) {
-      const $calenderIcon = $('.' + calenderIcon);
-      const $calenderSection = $('.easyepoch-calender-section');
-      const $timeSection = $('.easyepoch-time-section');
-
-      $timeSection.style.display = 'block';
-      $calenderSection.style.display = 'none';
-      $calenderIcon.classList.remove('active');
-      el.classList.add('active');
+    if (cls.contains('easyepoch-icon-time')) {
+      if (cls.contains('active')) return;
+      this.$timeSection.style.display = 'block';
+      this.$calenderSection.style.display = 'none';
+      this.$calenderIcon.classList.remove('active');
+      cls.add('active');
       this.toggleDisplayFade();
       return;
     }
 
-    let selectedDate;
-    const $active = $('.easyepoch-calender td.active');
-    if ($active) {
-      selectedDate = $active.textContent!.trim();
-    }
+    // Month navigation. Remember the selected day-of-month so it can be
+    // re-selected (clamped to the new month's length) after the re-render.
+    const active = this.$activeCell;
+    const selectedDay = active ? (active.textContent || '').trim() : '';
 
-    if (el.classList.contains(nextIcon)) {
+    if (cls.contains('easyepoch-icon-next')) {
       this.render(dateUtil.scrapeNextMonth(this.monthTracker));
-    }
-
-    if (el.classList.contains(previousIcon)) {
+    } else if (cls.contains('easyepoch-icon-previous')) {
       this.render(dateUtil.scrapePreviousMonth(this.monthTracker));
     }
 
-    if (selectedDate) {
-      const $dateTd = this.findElementWithDate(selectedDate, true);
-      this.selectDateElement($dateTd);
+    if (selectedDay) {
+      const $dateTd = this.findElementWithDate(selectedDay, true);
+      if ($dateTd) this.selectDateElement($dateTd);
     }
   }
 
@@ -737,8 +728,8 @@ class EasyEpoch {
         return;
       }
 
-      const formattedTime = dateUtil.formatTimeFromInputElement(value, this.showSeconds);
-      this.$time.textContent = formattedTime;
+      const [hours, minutes, seconds] = dateUtil.parseTimeInput(value);
+      this.setTime(hours, minutes, this.showSeconds ? seconds : 0, false);
       this.updateSelectedDate();
     });
 
@@ -969,6 +960,30 @@ class EasyEpoch {
     if (restore && document.contains(restore) && typeof restore.focus === 'function') {
       restore.focus();
     }
+  }
+
+  // Tear the picker down: close it (restoring focus), detach the
+  // document-level key handler, remove the overlay from the DOM and drop all
+  // event handlers. Call this before discarding an instance in long-lived
+  // pages (SPAs, re-created pickers) so listeners and DOM don't accumulate.
+  // Safe to call more than once.
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+
+    if (this.$easyepochWrapper.classList.contains('active')) {
+      this.close();
+    }
+    document.removeEventListener('keydown', this.handleKeydown);
+
+    const wrapper = this.$easyepochWrapper;
+    if (wrapper.parentNode) {
+      wrapper.parentNode.removeChild(wrapper);
+    }
+
+    this._eventHandlers = {};
+    this.$activeCell = null;
+    this.previouslyFocused = null;
   }
 
   on(event: EasyEpochEvent, handler: HandlerFunction) {

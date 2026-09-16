@@ -1,3 +1,4 @@
+import { MonthData } from './date-util';
 type EasyEpochEvent = 'submit' | 'close';
 type EasyEpochTheme = 'light' | 'dark' | Record<string, string>;
 interface EasyEpochLocale {
@@ -56,21 +57,31 @@ declare class EasyEpoch {
     private $activeCell;
     private $timeSection;
     private $timeDisplay;
+    private $calenderIcon;
+    private $calenderSection;
     private monthTracker;
     private timeSectionDisabled;
     private showSeconds;
-    private minDate?;
-    private maxDate?;
+    private minKey?;
+    private maxKey?;
+    private firstDayOffset;
+    private daysInMonth;
+    private hours;
+    private minutes;
+    private seconds;
+    private timeText;
     private locale;
     private previouslyFocused;
+    private destroyed;
     constructor(arg1?: HTMLElement | string | EasyEpochOpts, arg2?: EasyEpochOpts);
     initElMethod(el: HTMLElement): void;
     init(wrapper: HTMLElement, opts: EasyEpochOpts): void;
-    private startOfDay;
+    private static dayKey;
     private resolveLocale;
     private applyLocaleStrings;
     private isDateOutOfRange;
     reset(newDate?: Date): void;
+    private setTime;
     compactMode(): void;
     disableTimeSection(): void;
     enableTimeSection(): void;
@@ -85,12 +96,8 @@ declare class EasyEpoch {
     private static readonly BANNED_KEYS;
     setTheme(theme: EasyEpochTheme): void;
     injectTemplate(el: HTMLElement): HTMLElement;
-    clearRows(): void;
     updateDateComponents(date: Date): void;
-    render(data: {
-        month: unknown[][];
-        date: Date;
-    }): void;
+    render(data: MonthData): void;
     updateSelectedDate(el?: HTMLElement): void;
     selectDateElement(el: HTMLElement): void;
     findElementWithDate(date: string, returnLastIfNotFound?: boolean): HTMLElement | undefined;
@@ -108,6 +115,7 @@ declare class EasyEpoch {
     callEvent(event: EasyEpochEvent, dispatcher: (a: HandlerFunction) => void): void;
     open(): void;
     close(): void;
+    destroy(): void;
     on(event: EasyEpochEvent, handler: HandlerFunction): void;
     toggleDisplayFade(): void;
 }
