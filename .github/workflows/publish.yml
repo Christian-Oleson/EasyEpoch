@@ -1,11 +1,56 @@
 name: Publish to npm
 
+# Two-phase release via npm Trusted Publishing (OIDC) + staged publishing:
+#
+#   1. This workflow authenticates to npm with a short-lived OIDC token (no
+#      NPM_TOKEN secret to store or expire) and runs `npm stage publish`,
+#      which builds and uploads the tarball with provenance but leaves it
+#      *staged* - not installable, not tagged `latest`.
+#   2. A maintainer approves it from their own machine with
+#      `npm stage approve <stage-id>` (prompts for 2FA). Only then is the
+#      version published.
+#
+# Staging keeps a human with 2FA in the loop: a compromised Action or
+# repository can at most leave a tarball waiting for approval, never ship
+# code to users. See `npm help stage`.
+#
+# One-time setup on npmjs.com -> package "easyepoch" -> Settings:
+#   Trusted Publishing -> GitHub Actions:
+#     repository owner: Christian-Oleson   repository: EasyEpoch
+#     workflow filename: publish.yml       environment: (leave blank)
+#     Allowed actions: `npm stage publish` is always allowed; leave
+#     "Allow npm publish" UNTICKED so this workflow cannot publish directly.
+#   Publishing access: "Require two-factor authentication and disallow tokens".
+# Requires npm >= 11.15, which is why the publish job upgrades npm below.
 on:
   release:
     types: [published]
+  # Manual runs. With channel "release" this stages package.json's version
+  # under the `latest` tag exactly like a GitHub release (useful to re-stage
+  # after a rejected build). Any other channel stages a *prerelease* of the
+  # selected branch under that dist-tag, so non-release builds can be tried
+  # with e.g. `npm install easyepoch@next` without touching `latest`.
+  # Prereleases must run from this file too: npm allows a single trusted
+  # publisher per package, matched on the workflow filename.
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: >-
+          "release" = stage package.json's version as latest. next / beta / rc =
+          stage a prerelease of the selected branch under that dist-tag.
+        type: choice
+        options: [release, next, beta, rc]
+        default: release
+      version:
+        description: >-
+          Prerelease channels only. Explicit version such as 2.1.0-beta.1; leave
+          blank for <package.json version>-<channel>.<run number>.g<short sha>.
+        type: string
+        required: false
 
 # Default minimal permissions for the test job. The publish job widens to
-# id-token:write so it can request the OIDC token for npm provenance.
+# id-token:write so it can request the OIDC token for trusted publishing and
+# npm provenance.
 permissions:
   contents: read
 
@@ -45,10 +90,98 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      # Node 22 bundles npm 10.x; staged + trusted publishing need npm >= 11.15.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest && npm --version
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      # Decide what is being staged. Releases publish package.json's version
+      # as `latest` and must match the release tag (guards against a missed
+      # version bump). Prerelease channels rewrite the version in the
+      # workspace only (nothing is committed) and use the channel as dist-tag.
+      - name: Resolve version and dist-tag
+        id: meta
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          CHANNEL: ${{ github.event_name == 'release' && 'release' || inputs.channel }}
+          EXPLICIT_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          base=$(node -p "require('./package.json').version")
+          if [ "$CHANNEL" = "release" ]; then
+            version="$base"
+            tag="latest"
+            if [ -n "$RELEASE_TAG" ] && [ "$RELEASE_TAG" != "v$base" ]; then
+              echo "::error::Release tag '$RELEASE_TAG' does not match package.json version '$base'. Bump the version and re-cut the release."
+              exit 1
+            fi
+          else
+            tag="$CHANNEL"
+            if [ -n "$EXPLICIT_VERSION" ]; then
+              version="$EXPLICIT_VERSION"
+            else
+              version="${base}-${tag}.${GITHUB_RUN_NUMBER}.g$(git rev-parse --short HEAD)"
+            fi
+            case "$version" in
+              *-*) ;;
+              *) echo "::error::Prerelease version '$version' has no prerelease suffix; it would shadow a real release."; exit 1 ;;
+            esac
+            npm version "$version" --no-git-tag-version --allow-same-version
+          fi
+          echo "Staging easyepoch@$version with dist-tag '$tag'"
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      # prepack runs `npm run build` (rspack bundles + tsc declarations), so
+      # what is staged is always built from the checked-out source. npm prints
+      # "+ easyepoch@x.y.z (staged with id <uuid>)"; the build's own output
+      # precedes it, so the id is picked out by pattern rather than by
+      # parsing stdout as JSON.
+      - name: Stage release on npm
+        id: stage
+        env:
+          DIST_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          npm stage publish --provenance --access public --tag "$DIST_TAG" 2>&1 | tee stage-output.txt
+          node -e '
+            const fs = require("fs");
+            const out = fs.readFileSync("stage-output.txt", "utf8");
+            const m = out.match(/staged with id ([0-9a-f-]{36})/i) || out.match(/"stageId"\s*:\s*"([0-9a-f-]{36})"/i);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `stage_id=${m ? m[1] : ""}\n`);
+          '
+
+      - name: Write approval instructions to the job summary
+        env:
+          STAGE_ID: ${{ steps.stage.outputs.stage_id }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DIST_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          {
+            echo "## easyepoch@${VERSION} is staged on npm (dist-tag \`${DIST_TAG}\`) - approval needed"
+            echo
+            echo "The tarball is uploaded with provenance but **not published**. A maintainer must approve it (2FA prompt):"
+            echo
+            echo '```bash'
+            echo "npm install -g npm@latest        # needs npm >= 11.15"
+            echo "npm stage list easyepoch         # confirm the staged version"
+            if [ -n "$STAGE_ID" ]; then
+              echo "npm stage approve ${STAGE_ID}"
+            else
+              echo "npm stage approve <stage-id>     # id from 'npm stage list'"
+            fi
+            echo '```'
+            echo
+            echo "After approval it installs with:"
+            echo
+            echo '```bash'
+            echo "npm install easyepoch@${VERSION}"
+            if [ "$DIST_TAG" != "latest" ]; then
+              echo "npm install easyepoch@${DIST_TAG}    # tracks the newest ${DIST_TAG} prerelease"
+            fi
+            echo '```'
+            echo
+            echo "To discard it instead: \`npm stage reject <stage-id>\` (also required before re-staging the same version)."
+          } >> "$GITHUB_STEP_SUMMARY"

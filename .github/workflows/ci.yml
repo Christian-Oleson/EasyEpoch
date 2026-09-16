@@ -15,10 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # PRs run a single Node version to save Actions minutes; pushes to
-        # main run the full 20/22/24 matrix so cross-version regressions
-        # still get caught before release.
-        node-version: ${{ fromJSON(github.event_name == 'pull_request' && '[22]' || '[20, 22, 24]') }}
+        # Full Node matrix on pull requests as well as on main. Each job takes
+        # ~15 s and Actions minutes are free for public repositories, while the
+        # "test (24)" check is required by the main branch ruleset - a PR-only
+        # Node 22 run left that check permanently "expected", so pull requests
+        # could never go green without an admin bypass.
+        node-version: [20, 22, 24]
     steps:
       - uses: actions/checkout@v7
 
