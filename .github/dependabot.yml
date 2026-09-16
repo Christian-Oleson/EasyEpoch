@@ -8,6 +8,14 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - dependencies
+    ignore:
+      # TypeScript 7 (the Go-native compiler) changes the compiler API and
+      # typescript-eslint crashes on load with it (latest 8.x declares
+      # typescript >=4.8.4 <6.1.0). Hold TS major bumps until typescript-eslint
+      # publishes TS 7 support, then drop this entry.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
     groups:
       dev-dependencies:
         dependency-type: development
