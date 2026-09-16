@@ -343,6 +343,8 @@ npm run build    # Production build
 npm test         # Run tests
 ```
 
+Release notes live in [CHANGELOG.md](./CHANGELOG.md).
+
 ## Support
 
 If EasyEpoch saves you some time, you can [buy me a coffee](https://www.buymeacoffee.com/christianoleson) ☕ — it helps keep the project maintained, tested and dependency-free.
