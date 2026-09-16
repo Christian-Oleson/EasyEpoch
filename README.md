@@ -345,6 +345,12 @@ npm test         # Run tests
 
 Release notes live in [CHANGELOG.md](./CHANGELOG.md).
 
+### Releasing
+
+1. Bump `version` in `package.json` (`npm version <x.y.z> --no-git-tag-version`), add a `CHANGELOG.md` entry, merge to `main`.
+2. Create a GitHub release with tag `v<x.y.z>`. The **Publish to npm** workflow runs the test matrix and publishes with provenance.
+3. Publishing uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. The trusted publisher is configured once on npmjs.com under the package's settings (GitHub Actions, workflow `publish.yml`). The workflow can also be re-run manually from the Actions tab (`workflow_dispatch`).
+
 ## Support
 
 If EasyEpoch saves you some time, you can [buy me a coffee](https://www.buymeacoffee.com/christianoleson) ☕ — it helps keep the project maintained, tested and dependency-free.

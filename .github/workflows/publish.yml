@@ -1,11 +1,21 @@
 name: Publish to npm
 
+# Publishes via npm Trusted Publishing (OIDC): GitHub Actions proves its
+# identity to the registry with a short-lived token, so no NPM_TOKEN secret is
+# stored or can expire. One-time setup on npmjs.com -> package "easyepoch" ->
+# Settings -> Trusted Publishing -> GitHub Actions:
+#   repository owner: Christian-Oleson   repository: EasyEpoch
+#   workflow filename: publish.yml       environment: (leave blank)
+# Requires npm >= 11.5.1, which is why the publish job upgrades npm below.
 on:
   release:
     types: [published]
+  # Manual re-run (e.g. after fixing the pipeline) without re-cutting the tag.
+  workflow_dispatch:
 
 # Default minimal permissions for the test job. The publish job widens to
-# id-token:write so it can request the OIDC token for npm provenance.
+# id-token:write so it can request the OIDC token for trusted publishing and
+# npm provenance.
 permissions:
   contents: read
 
@@ -45,10 +55,14 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      # Node 22 bundles npm 10.x; trusted publishing needs npm >= 11.5.1.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest && npm --version
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      # prepack runs `npm run build` (rspack bundles + tsc declarations), so
+      # what is published is always built from the tagged source.
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
