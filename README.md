@@ -347,10 +347,14 @@ Release notes live in [CHANGELOG.md](./CHANGELOG.md).
 
 ### Releasing
 
-Releases are two-phase: CI **stages** the package on npm, a maintainer **approves** it with 2FA. A compromised workflow can therefore never publish on its own.
+Releases are automated from `main` and gated by a human: CI **stages** the package on npm, a maintainer **approves** it with 2FA. No GitHub release is cut by hand, and a compromised workflow can never publish `easyepoch` on its own.
 
-1. Bump `version` in `package.json` (`npm version <x.y.z> --no-git-tag-version`), add a `CHANGELOG.md` entry, merge to `main`.
-2. Create a GitHub release with tag `v<x.y.z>`. The **Publish to npm** workflow runs the test matrix, builds, and runs `npm stage publish --provenance`. The tarball is now on npm but not installable and not tagged `latest`. The job summary shows the exact approve command.
+1. In a PR: bump `version` in `package.json` (`npm version <x.y.z> --no-git-tag-version`) and add a `## [x.y.z]` entry to `CHANGELOG.md`. Merge it.
+2. On the merge, the **Publish to npm** workflow sees a version that is not on npm yet and, after the test matrix:
+   - creates the `v<x.y.z>` tag and a GitHub release whose notes are that CHANGELOG entry;
+   - runs `npm stage publish --provenance`. The tarball is on npm but not installable and not tagged `latest`. The job summary shows the exact approve command.
+
+   Merges that don't change the version publish nothing.
 3. Approve from your own machine (prompts for your 2FA code):
 
    ```bash
@@ -359,25 +363,40 @@ Releases are two-phase: CI **stages** the package on npm, a maintainer **approve
    npm stage approve <stage-id>  # publishes it; or `npm stage reject <stage-id>` to discard
    ```
 
-   A staged version occupies its version number: to re-stage the same version (e.g. after a fix), `npm stage reject` the old one first.
+   A staged version occupies its version number: to re-stage the same version (e.g. after a fix), `npm stage reject` the old one first, then run the workflow manually (Actions → *Publish to npm* → *Run workflow*, channel `release`). Pushes to `main` won't retry once the tag exists.
 
-Authentication uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. One-time setup on npmjs.com under the package's settings:
+### Preview builds for pull requests
 
-- **Trusted Publishing** → GitHub Actions: owner `Christian-Oleson`, repository `EasyEpoch`, workflow `publish.yml`, environment blank. Under *Allowed actions*, `npm stage publish` is always allowed; leave **Allow npm publish** unticked so the workflow can only stage.
+Every push to a pull request from this repository publishes a preview to the separate **`easyepoch-preview`** package — directly, no approval — as `<version>-pr<N>.<run>.g<sha>` under the dist-tag `pr-<N>`, and posts the install command on the PR:
+
+```bash
+npm install easyepoch@npm:easyepoch-preview@pr-88
+```
+
+The alias installs it under the name `easyepoch`, so `import EasyEpoch from 'easyepoch'` works unchanged. `pr-<N>` always points at the newest build for that PR; pin an exact version (`easyepoch-preview@2.0.0-pr88.130.gabc1234`) to freeze it. `easyepoch@latest` is never touched. Fork and Dependabot PRs are skipped (they cannot obtain the OIDC token needed to publish).
+
+Previews are a separate package because a trusted publisher's "Allow npm publish" permission is package-wide: `easyepoch` keeps it off so it can only ever be staged, `easyepoch-preview` has it on.
+
+### Prereleases of a branch (`next` / `beta` / `rc`)
+
+For a hand-picked, approved prerelease of the real package: Actions → **Publish to npm** → *Run workflow* → pick the **branch**, set *channel* to `next` (or `beta` / `rc`), leave *version* blank. CI stages `<package.json version>-next.<run>.g<sha>` under the `next` dist-tag; approve it like a release, then `npm install easyepoch@next` (newest on the channel) or the exact version. Set *version* explicitly (e.g. `2.1.0-beta.1`) for a human-readable series. Nothing is committed; provenance points at the exact commit built.
+
+### Publishing setup (one-time)
+
+Authentication uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — no npm token is stored in the repo. npm allows one trusted publisher per package, matched on the workflow filename, which is why every publishing path lives in `publish.yml`. On npmjs.com, for **each** of `easyepoch` and `easyepoch-preview` → Settings:
+
+- **Trusted Publishing** → GitHub Actions: owner `Christian-Oleson`, repository `EasyEpoch`, workflow `publish.yml`, environment blank.
+  - `easyepoch`: under *Allowed actions* leave **Allow npm publish** unticked (stage only).
+  - `easyepoch-preview`: tick **Allow npm publish**.
 - **Publishing access** → "Require two-factor authentication and disallow tokens".
 
-The workflow can also be run manually from the Actions tab (`workflow_dispatch`), e.g. to re-stage after rejecting a build.
+A trusted publisher can only be attached to a package that already exists, so `easyepoch-preview` must be created once by hand (2FA prompt):
 
-### Prereleases (trying a branch before it is released)
-
-To test a feature branch as a real npm install without touching `latest`:
-
-1. Actions → **Publish to npm** → *Run workflow* → pick the **branch**, set *channel* to `next` (or `beta` / `rc`), leave *version* blank.
-2. CI tests and stages `<package.json version>-next.<run>.g<sha>` (for example `2.0.0-next.12.gf0f52f3`) under the `next` dist-tag. The job summary shows the approve command.
-3. Approve it as for a release: `npm stage approve <stage-id>` (2FA).
-4. Install it anywhere: `npm install easyepoch@next` (newest prerelease on that channel) or `npm install easyepoch@2.0.0-next.12.gf0f52f3` (that exact build).
-
-Prereleases never move `latest`, so `npm install easyepoch` is unaffected. Set *version* explicitly (e.g. `2.1.0-beta.1`) when you want a human-readable prerelease series. The version is rewritten only in the workflow's checkout — nothing is committed — and provenance still points at the exact commit that was built. Prereleases run through the same trusted publisher (npm allows one per package, matched on the workflow filename), which is why they live in `publish.yml`.
+```bash
+mkdir easyepoch-preview && cd easyepoch-preview
+npm init -y --init-version 0.0.0 && npm pkg set name=easyepoch-preview description="Preview builds of easyepoch published from pull requests. Install with: npm i easyepoch@npm:easyepoch-preview@pr-<N>" repository.url=git+https://github.com/Christian-Oleson/EasyEpoch.git license=MIT
+npm publish --access public
+```
 
 For a quick local try without publishing anything, `npm install github:Christian-Oleson/EasyEpoch#<branch>` also works because `dist/` is committed — but only if that branch's `dist/` has been rebuilt (`npm run build`).
 
