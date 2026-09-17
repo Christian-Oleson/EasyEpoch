@@ -31,10 +31,21 @@ All notable changes to EasyEpoch are documented here. The format follows
 
 ### Fixed
 
+- `sideEffects` was `false`, which let bundlers tree-shake away a bare
+  `import 'easyepoch/css'` and leave the picker unstyled in production builds.
+  CSS is now declared side-effectful.
 - `files` listed `easyepoch.d.ts`, which does not exist in the repository.
 - CI now verifies that the committed `dist/` matches a fresh `npm run build`,
   so a dependency bump can no longer leave the published bundles stale (and
-  running the build locally no longer silently dirties the working tree).
+  running the build locally no longer silently dirties the working tree). The
+  check rebuilds into a cleaned directory and inspects `git status`, so it also
+  catches artifacts the build no longer emits and generated files that were
+  never committed.
+- CI now installs the packed tarball into a throwaway project and exercises
+  every documented entry point — CommonJS, native ESM, the `easyepoch/css`
+  subpath, and all three TypeScript import forms. Nothing previously covered
+  the published layout, which is how 2.0.0 shipped with `require('easyepoch')`
+  returning an empty object.
 
 ## [2.0.1] - 2026-09-16
 

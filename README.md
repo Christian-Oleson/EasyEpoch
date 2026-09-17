@@ -25,6 +25,8 @@ Always load the stylesheet alongside the script — the picker is unstyled witho
 import 'easyepoch/css';
 ```
 
+(The package marks CSS as side-effectful, so bundlers won't tree-shake that import away.)
+
 EasyEpoch ships as an ES module, a CommonJS module, and a browser global. Pick whichever matches your setup; all three expose the same class.
 
 **ES modules / bundlers** (resolves to `dist/easyepoch.mjs`):
@@ -371,7 +373,8 @@ npm test               # Unit tests (vitest + jsdom)
 npm run test:coverage  # Unit tests with coverage
 npm run test:e2e       # Browser smoke tests (Playwright/Chromium)
 npm run lint           # ESLint
-npm run verify:dist    # Rebuild and fail if committed dist/ is stale
+npm run verify:dist    # Rebuild from scratch and fail if committed dist/ is stale
+npm run verify:package # Pack, install the tarball, and check every entry point
 ```
 
 Before running the browser tests for the first time, install the browser:
