@@ -20,7 +20,13 @@ jobs:
         # "test (24)" check is required by the main branch ruleset - a PR-only
         # Node 22 run left that check permanently "expected", so pull requests
         # could never go green without an admin bypass.
-        node-version: [20, 22, 24]
+        #
+        # Node 20 was dropped when the test toolchain moved past it: vitest 5
+        # requires ^22.12 and jsdom 30 requires ^22.22.2 (Node 20 itself went
+        # end-of-life in April 2026). This is a dev-toolchain floor only - the
+        # published package declares no `engines` and still ships ES2017
+        # browser bundles, so consumers are unaffected.
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v7
 
