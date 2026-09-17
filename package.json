@@ -5,7 +5,9 @@
   "main": "./dist/easyepoch.node.js",
   "module": "./dist/easyepoch.mjs",
   "types": "./dist/index.d.ts",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "import": {
@@ -28,8 +30,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint lib/",
-    "verify:dist": "npm run build && git diff --exit-code --stat -- dist/",
-    "test:e2e": "npm run build && playwright test"
+    "verify:dist": "node scripts/verify-dist.mjs",
+    "test:e2e": "npm run build && playwright test",
+    "verify:package": "node scripts/verify-package.mjs"
   },
   "files": [
     "dist/"

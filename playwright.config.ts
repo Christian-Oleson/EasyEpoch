@@ -11,7 +11,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['github'], ['list']] : [['list']],
+  // The `html` reporter is what writes playwright-report/, which the CI job
+  // uploads as an artifact when a run fails; without it that upload would find
+  // nothing. `open: 'never'` keeps it from trying to launch a browser on CI.
+  reporter: process.env.CI
+    ? [['github'], ['list'], ['html', { open: 'never' }]]
+    : [['list']],
   use: {
     trace: 'on-first-retry',
   },

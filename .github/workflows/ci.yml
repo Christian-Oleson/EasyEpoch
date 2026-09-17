@@ -96,10 +96,29 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      # Removes dist/ and rebuilds, then checks `git status` (not `git diff`,
+      # which cannot see untracked or no-longer-emitted files).
       - name: Rebuild and check for drift
-        run: |
-          npm run build
-          if ! git diff --exit-code --stat -- dist/; then
-            echo "::error::dist/ is out of date. Run 'npm run build' and commit the result."
-            exit 1
-          fi
+        run: npm run verify:dist
+
+  # Installs the packed tarball into a throwaway project and exercises every
+  # documented entry point. Without this, a broken `exports` map or a missing
+  # ESM bundle passes every other check - which is exactly how 2.0.0 shipped
+  # with `require('easyepoch')` returning an empty object.
+  verify-package:
+    name: packed package is consumable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Pack and verify consumption
+        run: npm run verify:package
