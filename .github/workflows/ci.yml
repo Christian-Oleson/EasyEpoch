@@ -41,3 +41,65 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  # Browser smoke tests against the real built bundle. jsdom cannot evaluate
+  # CSS, so focus management, pane visibility and genuine event dispatch are
+  # only observable in a real browser.
+  e2e:
+    name: e2e (chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `test:e2e` runs the build first so the fixture loads current bundles.
+      - name: Run Playwright tests
+        run: npm run test:e2e
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # dist/ is committed (so `npm install github:...#branch` works) but is also
+  # rebuilt by prepack at publish time. Without this check the two can drift:
+  # a dependency bump that changes the bundler's output silently leaves the
+  # committed bundles stale, and simply running `npm run build` locally dirties
+  # the working tree. Fail the PR instead, so whoever bumps the dependency
+  # commits the rebuilt bundles alongside it.
+  verify-dist:
+    name: dist is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Rebuild and check for drift
+        run: |
+          npm run build
+          if ! git diff --exit-code --stat -- dist/; then
+            echo "::error::dist/ is out of date. Run 'npm run build' and commit the result."
+            exit 1
+          fi

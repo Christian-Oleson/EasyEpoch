@@ -1,13 +1,21 @@
 {
   "name": "easyepoch",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "A lightweight datetime picker in vanilla JavaScript with zero dependencies.",
   "main": "./dist/easyepoch.node.js",
+  "module": "./dist/easyepoch.mjs",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
   "exports": {
     ".": {
-      "require": "./dist/easyepoch.node.js",
+      "import": {
+        "types": "./dist/index.esm.d.ts",
+        "default": "./dist/easyepoch.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/easyepoch.node.js"
+      },
       "default": "./dist/easyepoch.node.js"
     },
     "./css": "./dist/easyepoch.css"
@@ -19,11 +27,12 @@
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint lib/"
+    "lint": "eslint lib/",
+    "verify:dist": "npm run build && git diff --exit-code --stat -- dist/",
+    "test:e2e": "npm run build && playwright test"
   },
   "files": [
-    "dist/",
-    "easyepoch.d.ts"
+    "dist/"
   ],
   "repository": {
     "type": "git",
@@ -51,8 +60,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.57.0",
     "@rspack/cli": "^2.0.0",
     "@rspack/core": "^2.0.0",
+    "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^5.0.0",
     "eslint": "^10.1.0",
     "eslint-plugin-security": "^4.0.0",

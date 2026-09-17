@@ -2,6 +2,19 @@ const path = require('path');
 const rspack = require('@rspack/core');
 
 const ROOT_DIR = __dirname;
+
+// ES2017: the library already relies on unpolyfilled ES2015+ APIs
+// (Array.from, String.prototype.repeat, DOMParser), so an ES5 target never
+// bought IE11 support - it only added class / spread / template-literal
+// helpers to the bundle.
+const swcOptions = (moduleType) => ({
+  jsc: {
+    parser: { syntax: 'typescript' },
+    target: 'es2017',
+  },
+  module: { type: moduleType },
+});
+
 module.exports = function (env) {
   const production = env && env.production;
   let config = {
@@ -33,25 +46,21 @@ module.exports = function (env) {
     ],
     module: {
       rules: [
+        // The ESM entry (lib/index.esm.ts) must be compiled as a real ES
+        // module so the bundle can carry `export default`. Everything else
+        // stays CommonJS because lib/index.ts uses `export = EasyEpoch`,
+        // which swc refuses to compile under an ESM target.
+        {
+          test: /index\.esm\.ts$/,
+          loader: 'builtin:swc-loader',
+          options: swcOptions('es6'),
+          type: 'javascript/auto',
+        },
         {
           test: /\.ts$/,
-          exclude: [/node_modules/, /tests/],
+          exclude: [/node_modules/, /tests/, /index\.esm\.ts$/],
           loader: 'builtin:swc-loader',
-          options: {
-            jsc: {
-              parser: {
-                syntax: 'typescript',
-              },
-              // ES2017: the library already relies on unpolyfilled ES2015+
-              // APIs (Array.from, String.prototype.repeat, DOMParser), so an
-              // ES5 target never bought IE11 support - it only added class /
-              // spread / template-literal helpers to the bundle.
-              target: 'es2017',
-            },
-            module: {
-              type: 'commonjs',
-            },
-          },
+          options: swcOptions('commonjs'),
           type: 'javascript/auto',
         }
       ]
@@ -80,7 +89,29 @@ module.exports = function (env) {
       plugins: [],
     };
 
-    config = [config, nodeConfig];
+    // Build a real ES module so bundlers and native ESM (`import`, and
+    // `<script type="module">` straight from a CDN) get a module instead of
+    // going through CommonJS interop. Built from lib/index.esm.ts - see the
+    // loader rules above for why a separate entry is required. The .mjs
+    // extension matters: this package is CommonJS ("type" is unset), so a
+    // plain .js file would be parsed as CommonJS by Node.
+    const esmConfig = {
+      ...config,
+      entry: {
+        easyepoch: './lib/index.esm.ts'
+      },
+      output: {
+        ...config.output,
+        filename: '[name].mjs',
+        library: { type: 'module' },
+        module: true,
+        chunkFormat: 'module',
+      },
+      experiments: { outputModule: true },
+      plugins: [],
+    };
+
+    config = [config, nodeConfig, esmConfig];
   } else {
     config.output.publicPath = '/dist/';
   }

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EasyEpoch e2e fixture</title>
+  <!-- Loads the real built artifacts, so these tests exercise exactly what
+       ships to consumers via <script>. -->
+  <link rel="stylesheet" href="../dist/easyepoch.css">
+</head>
+<body>
+  <button id="open">Open picker</button>
+  <button id="after">Focus sentinel</button>
+  <div id="out"></div>
+  <div id="closed"></div>
+
+  <script src="../dist/easyepoch.js"></script>
+  <script>
+    // Fixed date so assertions are deterministic regardless of when CI runs.
+    var picker = new EasyEpoch({ selectedDate: new Date(2024, 5, 15, 13, 30) });
+
+    document.getElementById('open').addEventListener('click', function () {
+      picker.open();
+    });
+
+    picker.on('submit', function (date, readableDate) {
+      document.getElementById('out').textContent = readableDate;
+    });
+
+    picker.on('close', function () {
+      document.getElementById('closed').textContent = 'closed';
+    });
+  </script>
+</body>
+</html>

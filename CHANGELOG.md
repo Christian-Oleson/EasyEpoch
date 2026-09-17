@@ -4,6 +4,38 @@ All notable changes to EasyEpoch are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-09-17
+
+### Added
+
+- **ES module build.** `dist/easyepoch.mjs` is a real ES module with a default
+  export, wired up through an `import` condition in `exports` (plus a `module`
+  field for older bundlers). Bundlers and native ESM — including
+  `<script type="module">` straight from a CDN — now get a module instead of
+  going through CommonJS interop. `require('easyepoch')` and
+  `import EasyEpoch = require('easyepoch')` are unchanged, and each condition
+  ships its own type declarations.
+- **Browser smoke tests** (Playwright, Chromium) covering what jsdom
+  structurally cannot: focus moving into the dialog, the `Tab` focus trap,
+  `Escape` restoring focus to the trigger, pane visibility, and keyboard
+  date navigation against the real built bundle.
+
+### Removed
+
+- **`dist/simplepicker.*`** — six leftover pre-fork artifacts (~108 KB) that
+  were published with every install, never rebuilt, and referenced nowhere.
+  Removing them frees more than the new ESM bundle and its sourcemap add
+  back, so unpacked install size still drops (325 kB → 319 kB); the packed
+  tarball grows slightly (82.6 kB → 88.4 kB) because the ESM bundle
+  compresses less well than the redundant legacy copies did.
+
+### Fixed
+
+- `files` listed `easyepoch.d.ts`, which does not exist in the repository.
+- CI now verifies that the committed `dist/` matches a fresh `npm run build`,
+  so a dependency bump can no longer leave the published bundles stale (and
+  running the build locally no longer silently dirties the working tree).
+
 ## [2.0.1] - 2026-09-16
 
 ### Fixed
@@ -108,6 +140,7 @@ All notable changes to EasyEpoch are documented here. The format follows
   custom properties for theming. See the
   [v1.1.0 release](https://github.com/Christian-Oleson/EasyEpoch/releases/tag/v1.1.0).
 
+[2.1.0]: https://github.com/Christian-Oleson/EasyEpoch/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/Christian-Oleson/EasyEpoch/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/Christian-Oleson/EasyEpoch/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/Christian-Oleson/EasyEpoch/releases/tag/v1.1.0
