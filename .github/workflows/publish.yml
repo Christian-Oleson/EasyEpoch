@@ -166,7 +166,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22, 24]
+        # Matches ci.yml. Node 20 dropped: vitest 5 requires ^22.12 and
+        # jsdom 30 requires ^22.22.2 (Node 20 is EOL as of April 2026). The
+        # published package declares no `engines`, so consumers are unaffected.
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v7
 
