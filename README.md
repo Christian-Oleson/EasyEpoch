@@ -19,22 +19,49 @@ npm install easyepoch
 
 ## Usage
 
-Include the CSS and JavaScript files from the `dist/` directory. The CSS file `dist/easyepoch.css` styles the picker, and the JavaScript file `dist/easyepoch.js` provides the picker logic.
+Always load the stylesheet alongside the script — the picker is unstyled without it:
 
-If you use a bundler with `require` or ES6 `import`:
+```javascript
+import 'easyepoch/css';
+```
+
+EasyEpoch ships as an ES module, a CommonJS module, and a browser global. Pick whichever matches your setup; all three expose the same class.
+
+**ES modules / bundlers** (resolves to `dist/easyepoch.mjs`):
 
 ```javascript
 import EasyEpoch from 'easyepoch';
 ```
 
-For TypeScript:
-```typescript
-import EasyEpoch = require('easyepoch');
+**CommonJS** (resolves to `dist/easyepoch.node.js`):
+
+```javascript
+const EasyEpoch = require('easyepoch');
 ```
 
-If you include the script directly via a `<script>` tag, `EasyEpoch` is available as a global variable.
+**TypeScript** — both forms work, and each carries its own declarations:
 
-TypeScript declaration files are included with the package.
+```typescript
+import EasyEpoch from 'easyepoch';          // ESM
+import EasyEpoch = require('easyepoch');    // CommonJS
+```
+
+**Browser `<script>`** — `EasyEpoch` becomes a global:
+
+```html
+<link rel="stylesheet" href="https://unpkg.com/easyepoch/dist/easyepoch.css">
+<script src="https://unpkg.com/easyepoch/dist/easyepoch.js"></script>
+```
+
+**Browser `<script type="module">`** — no bundler required:
+
+```html
+<link rel="stylesheet" href="https://unpkg.com/easyepoch/dist/easyepoch.css">
+<script type="module">
+  import EasyEpoch from 'https://unpkg.com/easyepoch/dist/easyepoch.mjs';
+  const picker = new EasyEpoch();
+</script>
+```
 
 ## API
 
@@ -338,10 +365,19 @@ If you customize the picker via `setTheme()` and override `--easyepoch-primary`,
 ## Development
 
 ```bash
-npm start        # Dev server with hot reload
-npm run build    # Production build
-npm test         # Run tests
+npm start              # Dev server with hot reload
+npm run build          # Production build (bundles + type declarations)
+npm test               # Unit tests (vitest + jsdom)
+npm run test:coverage  # Unit tests with coverage
+npm run test:e2e       # Browser smoke tests (Playwright/Chromium)
+npm run lint           # ESLint
+npm run verify:dist    # Rebuild and fail if committed dist/ is stale
 ```
+
+Before running the browser tests for the first time, install the browser:
+`npx playwright install --with-deps chromium`.
+
+`dist/` is committed so that `npm install github:Christian-Oleson/EasyEpoch#<branch>` works. CI enforces that it matches a fresh build, so when a dependency bump changes the bundler's output, rebuild and commit `dist/` in the same PR.
 
 Release notes live in [CHANGELOG.md](./CHANGELOG.md).
 
