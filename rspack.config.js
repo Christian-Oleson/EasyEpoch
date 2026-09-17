@@ -68,8 +68,14 @@ module.exports = function (env) {
       },
       output: {
         ...config.output,
-        library: undefined,
-        libraryTarget: 'commonjs2',
+        // Use the modern `library` object form, NOT `library: undefined` +
+        // the deprecated `libraryTarget`. Under rspack 2 that combination
+        // exported the entry's (empty) static namespace, so
+        // `require('easyepoch')` returned `{}` instead of the class
+        // (regression shipped in 2.0.0). `type: 'commonjs2'` restores
+        // `module.exports = EasyEpoch`, matching how `export = EasyEpoch`
+        // is consumed via require() and default import.
+        library: { type: 'commonjs2' },
       },
       plugins: [],
     };
