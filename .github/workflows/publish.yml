@@ -1,43 +1,53 @@
 name: Publish to npm
 
-# Two-phase release via npm Trusted Publishing (OIDC) + staged publishing:
+# Release automation, entirely through npm Trusted Publishing (OIDC - no
+# stored npm token) from this single workflow file. npm allows exactly one
+# trusted publisher per package, matched on the workflow *filename*, so every
+# publishing path for both packages has to live in publish.yml.
 #
-#   1. This workflow authenticates to npm with a short-lived OIDC token (no
-#      NPM_TOKEN secret to store or expire) and runs `npm stage publish`,
-#      which builds and uploads the tarball with provenance but leaves it
-#      *staged* - not installable, not tagged `latest`.
-#   2. A maintainer approves it from their own machine with
-#      `npm stage approve <stage-id>` (prompts for 2FA). Only then is the
-#      version published.
+#   push to main      -> if package.json's version is not released yet:
+#                        create tag vX.Y.Z + a GitHub release (notes taken
+#                        from CHANGELOG.md), then `npm stage publish`
+#                        easyepoch with provenance. A maintainer finishes it
+#                        with `npm stage approve <id>` (2FA prompt). Merges
+#                        that do not bump the version publish nothing.
+#   pull_request      -> publish easyepoch-preview@X.Y.Z-pr<N>.<run>.g<sha>
+#                        directly (no approval) under dist-tag pr-<N>, and
+#                        post/update the install command on the PR. Skipped
+#                        for forks and Dependabot, which cannot obtain an
+#                        OIDC token.
+#   workflow_dispatch -> re-stage a release (e.g. after `npm stage reject`),
+#                        or stage a next / beta / rc prerelease of any
+#                        branch (approval required, like a release).
 #
-# Staging keeps a human with 2FA in the loop: a compromised Action or
-# repository can at most leave a tarball waiting for approval, never ship
-# code to users. See `npm help stage`.
+# Why previews are a separate package: a trusted publisher's "Allow npm
+# publish" switch is package-wide. easyepoch keeps it OFF so nothing can be
+# published without a human; easyepoch-preview has it ON so previews need no
+# approval. Consumers alias it back to the real name, so imports don't change:
+#   npm install easyepoch@npm:easyepoch-preview@pr-88
 #
-# One-time setup on npmjs.com -> package "easyepoch" -> Settings:
-#   Trusted Publishing -> GitHub Actions:
-#     repository owner: Christian-Oleson   repository: EasyEpoch
-#     workflow filename: publish.yml       environment: (leave blank)
-#     Allowed actions: `npm stage publish` is always allowed; leave
-#     "Allow npm publish" UNTICKED so this workflow cannot publish directly.
+# One-time setup on npmjs.com (each package -> Settings):
+#   Trusted Publishing -> GitHub Actions: owner Christian-Oleson, repository
+#     EasyEpoch, workflow filename publish.yml, environment blank.
+#   easyepoch:          Allowed actions -> "Allow npm publish" OFF (stage only).
+#   easyepoch-preview:  Allowed actions -> "Allow npm publish" ON. A trusted
+#     publisher can only be added to an existing package, so publish a stub
+#     of easyepoch-preview once by hand first (see README "Releasing").
 #   Publishing access: "Require two-factor authentication and disallow tokens".
-# Requires npm >= 11.15, which is why the publish job upgrades npm below.
+# Staged + trusted publishing need npm >= 11.15, hence the npm upgrade steps.
+
 on:
-  release:
-    types: [published]
-  # Manual runs. With channel "release" this stages package.json's version
-  # under the `latest` tag exactly like a GitHub release (useful to re-stage
-  # after a rejected build). Any other channel stages a *prerelease* of the
-  # selected branch under that dist-tag, so non-release builds can be tried
-  # with e.g. `npm install easyepoch@next` without touching `latest`.
-  # Prereleases must run from this file too: npm allows a single trusted
-  # publisher per package, matched on the workflow filename.
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       channel:
         description: >-
-          "release" = stage package.json's version as latest. next / beta / rc =
-          stage a prerelease of the selected branch under that dist-tag.
+          "release" = re-stage package.json's version as latest (only if it is
+          not on npm yet). next / beta / rc = stage a prerelease of the selected
+          branch under that dist-tag.
         type: choice
         options: [release, next, beta, rc]
         default: release
@@ -48,14 +58,111 @@ on:
         type: string
         required: false
 
-# Default minimal permissions for the test job. The publish job widens to
-# id-token:write so it can request the OIDC token for trusted publishing and
-# npm provenance.
+# Default minimal permissions. Publishing jobs widen what they need.
 permissions:
   contents: read
 
+# One preview publish per PR at a time (a newer push cancels the older run);
+# release runs are never cancelled.
+concurrency:
+  group: publish-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  plan:
+    name: Decide what to publish
+    runs-on: ubuntu-latest
+    # Forks and Dependabot run with a read-only token and cannot request the
+    # OIDC id-token, so there is nothing they could publish; skip early.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
+    outputs:
+      publish: ${{ steps.plan.outputs.publish }}
+      mode: ${{ steps.plan.outputs.mode }}
+      package: ${{ steps.plan.outputs.package }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Resolve package, version and dist-tag
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          CHANNEL: ${{ inputs.channel }}
+          EXPLICIT_VERSION: ${{ inputs.version }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          base=$(node -p "require('./package.json').version")
+          short=${HEAD_SHA:0:7}
+          publish=true
+          reason=""
+          package=easyepoch
+
+          case "$EVENT" in
+            push)
+              mode=release
+              version="$base"
+              tag=latest
+              if git ls-remote --exit-code --tags origin "refs/tags/v$base" >/dev/null 2>&1; then
+                publish=false
+                reason="tag v$base already exists, so this release was already initiated (re-run via workflow_dispatch if it needs re-staging)"
+              elif npm view "easyepoch@$base" version >/dev/null 2>&1; then
+                publish=false
+                reason="easyepoch@$base is already on npm"
+              fi
+              ;;
+            pull_request)
+              mode=preview
+              package=easyepoch-preview
+              tag="pr-$PR_NUMBER"
+              version="${base}-pr${PR_NUMBER}.${GITHUB_RUN_NUMBER}.g${short}"
+              ;;
+            workflow_dispatch)
+              if [ "$CHANNEL" = "release" ]; then
+                mode=release
+                version="$base"
+                tag=latest
+                if npm view "easyepoch@$base" version >/dev/null 2>&1; then
+                  publish=false
+                  reason="easyepoch@$base is already on npm"
+                fi
+              else
+                mode=prerelease
+                tag="$CHANNEL"
+                version="${EXPLICIT_VERSION:-${base}-${tag}.${GITHUB_RUN_NUMBER}.g${short}}"
+                case "$version" in
+                  *-*) ;;
+                  *) echo "::error::Prerelease version '$version' has no prerelease suffix; it would shadow a real release."; exit 1 ;;
+                esac
+              fi
+              ;;
+            *)
+              echo "::error::Unexpected event '$EVENT'"; exit 1 ;;
+          esac
+
+          echo "mode=$mode package=$package version=$version tag=$tag publish=$publish${reason:+ ($reason)}"
+          if [ "$publish" != "true" ]; then
+            echo "::notice::Nothing to publish: $reason"
+          fi
+          {
+            echo "publish=$publish"
+            echo "mode=$mode"
+            echo "package=$package"
+            echo "version=$version"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
   test:
+    needs: plan
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -75,12 +182,20 @@ jobs:
       - name: Run tests
         run: npm test
 
-  publish:
-    needs: test
+  # easyepoch: releases (push to main / dispatch) and manual prereleases.
+  # Always staged; a maintainer approves with 2FA.
+  stage:
+    name: Stage easyepoch@${{ needs.plan.outputs.version }}
+    needs: [plan, test]
+    if: needs.plan.outputs.publish == 'true' && needs.plan.outputs.package == 'easyepoch'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
+      contents: write # create the vX.Y.Z tag + GitHub release
+      id-token: write # OIDC for trusted publishing and provenance
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      DIST_TAG: ${{ needs.plan.outputs.tag }}
+      MODE: ${{ needs.plan.outputs.mode }}
     steps:
       - uses: actions/checkout@v7
 
@@ -90,60 +205,57 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      # Node 22 bundles npm 10.x; staged + trusted publishing need npm >= 11.15.
-      - name: Upgrade npm for trusted publishing
+      - name: Upgrade npm for staged + trusted publishing
         run: npm install -g npm@latest && npm --version
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Decide what is being staged. Releases publish package.json's version
-      # as `latest` and must match the release tag (guards against a missed
-      # version bump). Prerelease channels rewrite the version in the
-      # workspace only (nothing is committed) and use the channel as dist-tag.
-      - name: Resolve version and dist-tag
-        id: meta
+      # Prerelease versions exist only in this checkout; nothing is committed.
+      - name: Set prerelease version in the workspace
+        if: env.MODE == 'prerelease'
+        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      # Tag first, then stage: `plan` treats an existing tag as "release
+      # already initiated", so a failed staging is retried via
+      # workflow_dispatch (channel release) rather than by every later push.
+      - name: Create tag and GitHub release
+        if: env.MODE == 'release'
         env:
-          CHANNEL: ${{ github.event_name == 'release' && 'release' || inputs.channel }}
-          EXPLICIT_VERSION: ${{ inputs.version }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          base=$(node -p "require('./package.json').version")
-          if [ "$CHANNEL" = "release" ]; then
-            version="$base"
-            tag="latest"
-            if [ -n "$RELEASE_TAG" ] && [ "$RELEASE_TAG" != "v$base" ]; then
-              echo "::error::Release tag '$RELEASE_TAG' does not match package.json version '$base'. Bump the version and re-cut the release."
-              exit 1
-            fi
-          else
-            tag="$CHANNEL"
-            if [ -n "$EXPLICIT_VERSION" ]; then
-              version="$EXPLICIT_VERSION"
-            else
-              version="${base}-${tag}.${GITHUB_RUN_NUMBER}.g$(git rev-parse --short HEAD)"
-            fi
-            case "$version" in
-              *-*) ;;
-              *) echo "::error::Prerelease version '$version' has no prerelease suffix; it would shadow a real release."; exit 1 ;;
-            esac
-            npm version "$version" --no-git-tag-version --allow-same-version
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; re-staging only."
+            exit 0
           fi
-          echo "Staging easyepoch@$version with dist-tag '$tag'"
-          {
-            echo "version=$version"
-            echo "tag=$tag"
-          } >> "$GITHUB_OUTPUT"
+          node -e '
+            const fs = require("fs");
+            const v = process.env.VERSION;
+            let notes = "";
+            try {
+              const lines = fs.readFileSync("CHANGELOG.md", "utf8").split("\n");
+              const heading = new RegExp("^## \\[?" + v.replace(/\./g, "\\.") + "\\]?(\\s|$)");
+              const i = lines.findIndex(l => heading.test(l));
+              if (i >= 0) {
+                let j = i + 1;
+                while (j < lines.length && !/^## /.test(lines[j])) j++;
+                notes = lines.slice(i + 1, j).join("\n").trim();
+              }
+            } catch {}
+            if (!notes) notes = `Release v${v}. See CHANGELOG.md for details.`;
+            notes += "\n\n---\n_Published to npm via staged trusted publishing; the version becomes installable once a maintainer runs `npm stage approve`._\n";
+            fs.writeFileSync("release-notes.md", notes);
+          '
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file release-notes.md
+          echo "Created GitHub release v$VERSION"
 
       # prepack runs `npm run build` (rspack bundles + tsc declarations), so
       # what is staged is always built from the checked-out source. npm prints
       # "+ easyepoch@x.y.z (staged with id <uuid>)"; the build's own output
-      # precedes it, so the id is picked out by pattern rather than by
-      # parsing stdout as JSON.
-      - name: Stage release on npm
+      # precedes it, so the id is picked out by pattern rather than by parsing
+      # stdout as JSON.
+      - name: Stage on npm
         id: stage
-        env:
-          DIST_TAG: ${{ steps.meta.outputs.tag }}
         run: |
           npm stage publish --provenance --access public --tag "$DIST_TAG" 2>&1 | tee stage-output.txt
           node -e '
@@ -156,8 +268,6 @@ jobs:
       - name: Write approval instructions to the job summary
         env:
           STAGE_ID: ${{ steps.stage.outputs.stage_id }}
-          VERSION: ${{ steps.meta.outputs.version }}
-          DIST_TAG: ${{ steps.meta.outputs.tag }}
         run: |
           {
             echo "## easyepoch@${VERSION} is staged on npm (dist-tag \`${DIST_TAG}\`) - approval needed"
@@ -184,4 +294,80 @@ jobs:
             echo '```'
             echo
             echo "To discard it instead: \`npm stage reject <stage-id>\` (also required before re-staging the same version)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # easyepoch-preview: one directly-published build per PR push, no approval.
+  preview:
+    name: Publish easyepoch-preview@${{ needs.plan.outputs.version }}
+    needs: [plan, test]
+    if: needs.plan.outputs.publish == 'true' && needs.plan.outputs.package == 'easyepoch-preview'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write      # OIDC for trusted publishing and provenance
+      pull-requests: write # post the install command on the PR
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      DIST_TAG: ${{ needs.plan.outputs.tag }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest && npm --version
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # Rename + re-version in the workspace only. repository.url stays the
+      # real repo, so provenance still links the build to this commit.
+      - name: Point package.json at easyepoch-preview
+        run: |
+          npm pkg set name=easyepoch-preview
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          node -p "require('./package.json').name + '@' + require('./package.json').version"
+
+      # prepack builds dist/ from this PR's source before publishing.
+      - name: Publish preview to npm
+        run: npm publish --provenance --access public --tag "$DIST_TAG"
+
+      - name: Post install command on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          marker="<!-- easyepoch-preview -->"
+          short=${HEAD_SHA:0:7}
+          body=$(cat <<EOF
+          ${marker}
+          ### Preview build published
+
+          \`\`\`bash
+          npm install easyepoch@npm:easyepoch-preview@${DIST_TAG}
+          \`\`\`
+
+          Exact build: \`easyepoch-preview@${VERSION}\` (commit ${short}), with provenance. The \`${DIST_TAG}\` dist-tag always points at the newest build for this PR. \`easyepoch@latest\` is untouched.
+          EOF
+          )
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | head -n1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$body" >/dev/null
+            echo "Updated preview comment ${existing}"
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+            echo "Posted preview comment"
+          fi
+          {
+            echo "## Preview published: easyepoch-preview@${VERSION}"
+            echo
+            echo '```bash'
+            echo "npm install easyepoch@npm:easyepoch-preview@${DIST_TAG}"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

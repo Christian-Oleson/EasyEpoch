@@ -4,6 +4,19 @@ All notable changes to EasyEpoch are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-09-16
+
+### Fixed
+
+- **`require('easyepoch')` and `import EasyEpoch from 'easyepoch'` returned an
+  empty object instead of the class in 2.0.0**, breaking every bundler and
+  Node consumer (the `<script>` global build was unaffected, which is why it
+  went unnoticed). The Node/bundler build (`dist/easyepoch.node.js`) used the
+  deprecated `library: undefined` + `libraryTarget: 'commonjs2'` combination,
+  which under rspack 2 exported the entry's empty static namespace; it now
+  uses `library: { type: 'commonjs2' }` so `module.exports` is the class
+  again. If you installed 2.0.0, upgrade to 2.0.1. (#78 regression)
+
 ## [2.0.0] - 2026-09-16
 
 ### Breaking
@@ -95,5 +108,6 @@ All notable changes to EasyEpoch are documented here. The format follows
   custom properties for theming. See the
   [v1.1.0 release](https://github.com/Christian-Oleson/EasyEpoch/releases/tag/v1.1.0).
 
+[2.0.1]: https://github.com/Christian-Oleson/EasyEpoch/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/Christian-Oleson/EasyEpoch/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/Christian-Oleson/EasyEpoch/releases/tag/v1.1.0

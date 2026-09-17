@@ -1,6 +1,6 @@
 {
   "name": "easyepoch",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A lightweight datetime picker in vanilla JavaScript with zero dependencies.",
   "main": "./dist/easyepoch.node.js",
   "types": "./dist/index.d.ts",
